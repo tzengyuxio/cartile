@@ -65,6 +65,62 @@ const ZOOM_STEP = 0.1;
 // ============================================================
 const MODE = { VIEW: 'view', PAINT: 'paint' };
 
+// ============================================================
+// Coordinate conversion helpers (orthogonal / isometric)
+// ============================================================
+
+/** Return the projection type string for the current map grid. */
+function getProjection(grid) {
+    return (grid.projection && grid.projection.type) || 'orthogonal';
+}
+
+/**
+ * Convert tile (col, row) to screen-space pixel position (top-left of tile).
+ * For isometric projection the tiles form a diamond layout.
+ */
+function tileToScreen(col, row, grid) {
+    const tw = grid.tile_width || 16;
+    const th = grid.tile_height || 16;
+
+    if (getProjection(grid) === 'isometric') {
+        const mapWidth = grid.width || 0;
+        const offsetX = mapWidth * tw / 2; // center the diamond
+        return {
+            x: (col - row) * (tw / 2) + offsetX,
+            y: (col + row) * (th / 2),
+        };
+    }
+
+    // Orthogonal (default)
+    return {
+        x: col * tw,
+        y: row * th,
+    };
+}
+
+/**
+ * Convert a map-space pixel coordinate back to tile (col, row).
+ * Returns fractional values floored to integers.
+ */
+function screenToTile(mapX, mapY, grid) {
+    const tw = grid.tile_width || 16;
+    const th = grid.tile_height || 16;
+
+    if (getProjection(grid) === 'isometric') {
+        const mapWidth = grid.width || 0;
+        const offsetX = mapWidth * tw / 2;
+        const isoX = mapX - offsetX;
+        const col = Math.floor((isoX / (tw / 2) + mapY / (th / 2)) / 2);
+        const row = Math.floor((mapY / (th / 2) - isoX / (tw / 2)) / 2);
+        return { col, row };
+    }
+
+    return {
+        col: Math.floor(mapX / tw),
+        row: Math.floor(mapY / th),
+    };
+}
+
 function isTileLayer(layer) {
     return layer.type === 'tile' || layer.layer_type === 'tile';
 }
@@ -91,10 +147,7 @@ function eventToTileCoords(e) {
     const screenY = e.clientY - rect.top;
     const { mapX, mapY } = screenToMap(screenX, screenY);
     const grid = mapData.grid || {};
-    const tileWidth = grid.tile_width || 16;
-    const tileHeight = grid.tile_height || 16;
-    const col = Math.floor(mapX / tileWidth);
-    const row = Math.floor(mapY / tileHeight);
+    const { col, row } = screenToTile(mapX, mapY, grid);
     if (col < 0 || row < 0 || col >= (grid.width || 0) || row >= (grid.height || 0)) return null;
     return { col, row };
 }
@@ -723,8 +776,19 @@ function loadMap(map) {
 
     // Center the map in the canvas
     const grid = map.grid || {};
-    const mapPixelW = (grid.width || 0) * (grid.tile_width || 16);
-    const mapPixelH = (grid.height || 0) * (grid.tile_height || 16);
+    const projection = getProjection(grid);
+    const tw = grid.tile_width || 16;
+    const th = grid.tile_height || 16;
+    const mapW = grid.width || 0;
+    const mapH = grid.height || 0;
+    let mapPixelW, mapPixelH;
+    if (projection === 'isometric') {
+        mapPixelW = (mapW + mapH) * tw / 2;
+        mapPixelH = (mapW + mapH) * th / 2;
+    } else {
+        mapPixelW = mapW * tw;
+        mapPixelH = mapH * th;
+    }
     const container = document.getElementById('canvas-container');
     camera.zoom = 1.0;
     camera.x = -(container.clientWidth / camera.zoom - mapPixelW) / 2;
@@ -794,8 +858,7 @@ function render() {
                 const tsr = findTilesetForGid(tileInfo.gid);
                 if (!tsr) continue;
 
-                const destX = col * tileWidth;
-                const destY = row * tileHeight;
+                const { x: destX, y: destY } = tileToScreen(col, row, grid);
 
                 const tw = tsr.tileset.tile_width || tileWidth;
                 const th = tsr.tileset.tile_height || tileHeight;
@@ -827,13 +890,36 @@ function render() {
     }
 
     // Draw map boundary
-    const totalW = mapWidth * tileWidth;
-    const totalH = mapHeight * tileHeight;
+    const projection = getProjection(grid);
     ctx.strokeStyle = 'rgba(88, 166, 255, 0.4)';
     ctx.lineWidth = 1 / camera.zoom;
-    ctx.strokeRect(0, 0, totalW, totalH);
+
+    if (projection === 'isometric') {
+        // Diamond boundary for isometric maps
+        const top = tileToScreen(0, 0, grid);
+        const right = tileToScreen(mapWidth, 0, grid);
+        const bottom = tileToScreen(mapWidth, mapHeight, grid);
+        const left = tileToScreen(0, mapHeight, grid);
+        ctx.beginPath();
+        ctx.moveTo(top.x + tileWidth / 2, top.y);
+        ctx.lineTo(right.x + tileWidth / 2, right.y + tileHeight / 2);
+        ctx.lineTo(bottom.x + tileWidth / 2, bottom.y + tileHeight);
+        ctx.lineTo(left.x + tileWidth / 2, left.y + tileHeight / 2);
+        ctx.closePath();
+        ctx.stroke();
+    } else {
+        const totalW = mapWidth * tileWidth;
+        const totalH = mapHeight * tileHeight;
+        ctx.strokeRect(0, 0, totalW, totalH);
+    }
 
     // Draw origin axis lines (extend beyond map)
+    const totalW = projection === 'isometric'
+        ? (mapWidth + mapHeight) * tileWidth / 2
+        : mapWidth * tileWidth;
+    const totalH = projection === 'isometric'
+        ? (mapWidth + mapHeight) * tileHeight / 2
+        : mapHeight * tileHeight;
     const axisExtent = 2000 / camera.zoom;
     ctx.lineWidth = 1 / camera.zoom;
 
@@ -989,9 +1075,29 @@ function renderGridOverlay() {
     const th = grid.tile_height || 16;
     const mw = grid.width || 0;
     const mh = grid.height || 0;
+    const projection = getProjection(grid);
 
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
     ctx.lineWidth = 1 / camera.zoom;
+
+    if (projection === 'isometric') {
+        // Draw diamond grid lines
+        ctx.beginPath();
+        for (let col = 0; col <= mw; col++) {
+            const start = tileToScreen(col, 0, grid);
+            const end = tileToScreen(col, mh, grid);
+            ctx.moveTo(start.x + tw / 2, start.y);
+            ctx.lineTo(end.x + tw / 2, end.y + th);
+        }
+        for (let row = 0; row <= mh; row++) {
+            const start = tileToScreen(0, row, grid);
+            const end = tileToScreen(mw, row, grid);
+            ctx.moveTo(start.x + tw / 2, start.y + th);
+            ctx.lineTo(end.x + tw / 2, end.y);
+        }
+        ctx.stroke();
+        return;
+    }
 
     ctx.beginPath();
     for (let x = 0; x <= mw; x++) {
@@ -1207,13 +1313,10 @@ function screenToMap(screenX, screenY) {
 function updateHoveredTile(screenX, screenY) {
     const { mapX, mapY } = screenToMap(screenX, screenY);
     const grid = mapData.grid || {};
-    const tileWidth = grid.tile_width || 16;
-    const tileHeight = grid.tile_height || 16;
     const mapWidth = grid.width || 0;
     const mapHeight = grid.height || 0;
 
-    const col = Math.floor(mapX / tileWidth);
-    const row = Math.floor(mapY / tileHeight);
+    const { col, row } = screenToTile(mapX, mapY, grid);
 
     if (col < 0 || row < 0 || col >= mapWidth || row >= mapHeight) {
         hoveredTile = null;
@@ -1361,10 +1464,12 @@ function updateMapInfo() {
     }
 
     const grid = mapData.grid || {};
+    const projection = getProjection(grid);
     const lines = [
         { label: 'Name', value: mapData.name || '(unnamed)' },
         { label: 'Size', value: (grid.width || '?') + ' × ' + (grid.height || '?') + ' tiles' },
         { label: 'Tile Size', value: (grid.tile_width || '?') + ' × ' + (grid.tile_height || '?') + ' px' },
+        { label: 'Projection', value: projection },
         { label: 'Layers', value: mapData.layers ? mapData.layers.length : 0 },
         { label: 'Tilesets', value: mapData.tilesets ? mapData.tilesets.length : 0 },
     ];
