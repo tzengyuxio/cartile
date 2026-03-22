@@ -42,6 +42,9 @@ const MAX_UNDO = 100;
 // Help overlay
 let helpVisible = false;
 
+// Pending tileset file for new map modal
+let pendingTilesetFile = null;
+
 // Flip/rotation bitmask constants
 const FLIP_H = 0x80000000;
 const FLIP_V = 0x40000000;
@@ -1163,6 +1166,114 @@ function resizeCanvas() {
 }
 
 // ============================================================
+// New Map Modal
+// ============================================================
+function showNewMapModal() {
+    document.getElementById('new-map-modal').classList.remove('hidden');
+    document.getElementById('new-map-name').focus();
+    document.getElementById('new-map-name').select();
+    pendingTilesetFile = null;
+    document.getElementById('new-tileset-label').textContent = 'Drop a PNG here or click to select';
+    document.getElementById('new-tileset-drop').classList.remove('has-file');
+}
+
+function hideNewMapModal() {
+    document.getElementById('new-map-modal').classList.add('hidden');
+    pendingTilesetFile = null;
+}
+
+function isNewMapModalOpen() {
+    return !document.getElementById('new-map-modal').classList.contains('hidden');
+}
+
+function createNewMap() {
+    const name = document.getElementById('new-map-name').value.trim() || 'untitled';
+    const mapWidth = parseInt(document.getElementById('new-map-width').value) || 20;
+    const mapHeight = parseInt(document.getElementById('new-map-height').value) || 15;
+    const tileWidth = parseInt(document.getElementById('new-tile-width').value) || 16;
+    const tileHeight = parseInt(document.getElementById('new-tile-height').value) || 16;
+
+    const size = mapWidth * mapHeight;
+
+    const map = {
+        cartile: '0.1.0',
+        type: 'map',
+        name: name,
+        grid: {
+            type: 'square',
+            width: mapWidth,
+            height: mapHeight,
+            tile_width: tileWidth,
+            tile_height: tileHeight,
+            topology: 'bounded',
+            projection: { type: 'orthogonal' },
+            height_mode: 'none',
+        },
+        tilesets: [],
+        layers: [
+            {
+                type: 'tile',
+                name: 'Layer 1',
+                visible: true,
+                opacity: 1.0,
+                elevation: 0,
+                encoding: 'dense',
+                data: new Array(size).fill(0),
+            }
+        ],
+    };
+
+    // If a tileset image was provided, create a tileset entry
+    if (pendingTilesetFile) {
+        const img = tilesetImages[pendingTilesetFile.name.toLowerCase()];
+        if (img) {
+            const columns = Math.floor(img.width / tileWidth);
+            const rows = Math.floor(img.height / tileHeight);
+            map.tilesets.push({
+                name: pendingTilesetFile.name.replace(/\.[^.]+$/, ''),
+                tile_width: tileWidth,
+                tile_height: tileHeight,
+                image: pendingTilesetFile.name,
+                image_width: img.width,
+                image_height: img.height,
+                columns: columns,
+                tile_count: columns * rows,
+                margin: 0,
+                spacing: 0,
+                first_gid: 1,
+            });
+        }
+    }
+
+    hideNewMapModal();
+    loadMap(map);
+}
+
+function handleNewTilesetFile(file) {
+    const name = file.name.toLowerCase();
+    if (!name.endsWith('.png') && !name.endsWith('.jpg') && !name.endsWith('.webp')) {
+        showToast('Please select an image file (PNG, JPG, WEBP)');
+        return;
+    }
+
+    pendingTilesetFile = file;
+
+    // Load the image into tilesetImages immediately
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+        tilesetImages[file.name.toLowerCase()] = img;
+        document.getElementById('new-tileset-label').textContent = '\u2713 ' + file.name + ' (' + img.width + '\u00d7' + img.height + ')';
+        document.getElementById('new-tileset-drop').classList.add('has-file');
+    };
+    img.onerror = () => {
+        showToast('Failed to load image: ' + file.name);
+        pendingTilesetFile = null;
+    };
+    img.src = url;
+}
+
+// ============================================================
 // Keyboard Shortcuts
 // ============================================================
 function handleKeyDown(e) {
@@ -1185,18 +1296,28 @@ function handleKeyDown(e) {
         }
     }
 
-    // Close help on Escape
+    // Close modal or help on Escape
     if (e.key === 'Escape') {
+        if (isNewMapModalOpen()) {
+            hideNewMapModal();
+            return;
+        }
         if (helpVisible) {
             hideHelp();
             return;
         }
     }
 
+    // Skip remaining shortcuts when modal is open
+    if (isNewMapModalOpen()) return;
+
     // Single-key shortcuts (only when no modifier)
     if (e.ctrlKey || e.metaKey || e.altKey) return;
 
     switch (e.key.toLowerCase()) {
+        case 'n':
+            showNewMapModal();
+            break;
         case 'v':
             setMode('view');
             break;
@@ -1293,6 +1414,56 @@ function setupEventListeners() {
         if (e.target === document.getElementById('help-overlay')) {
             hideHelp();
         }
+    });
+
+    // New map button
+    document.getElementById('btn-new').addEventListener('click', showNewMapModal);
+
+    // New map modal
+    document.getElementById('btn-new-cancel').addEventListener('click', hideNewMapModal);
+    document.querySelector('#new-map-modal .modal-overlay').addEventListener('click', hideNewMapModal);
+    document.getElementById('btn-new-create').addEventListener('click', createNewMap);
+
+    // Enter key in modal submits
+    document.getElementById('new-map-modal').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            createNewMap();
+        }
+        if (e.key === 'Escape') {
+            hideNewMapModal();
+        }
+    });
+
+    // Tileset file drop zone in new map modal
+    const tilesetDrop = document.getElementById('new-tileset-drop');
+    const tilesetInput = document.getElementById('new-tileset-input');
+
+    tilesetDrop.addEventListener('click', () => tilesetInput.click());
+
+    tilesetDrop.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        tilesetDrop.classList.add('drag-over');
+    });
+
+    tilesetDrop.addEventListener('dragleave', () => {
+        tilesetDrop.classList.remove('drag-over');
+    });
+
+    tilesetDrop.addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        tilesetDrop.classList.remove('drag-over');
+        if (e.dataTransfer.files.length > 0) {
+            handleNewTilesetFile(e.dataTransfer.files[0]);
+        }
+    });
+
+    tilesetInput.addEventListener('change', () => {
+        if (tilesetInput.files.length > 0) {
+            handleNewTilesetFile(tilesetInput.files[0]);
+        }
+        tilesetInput.value = '';
     });
 
     // Layer management buttons

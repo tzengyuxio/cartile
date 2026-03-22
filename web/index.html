@@ -17,6 +17,7 @@
                 <button id="btn-mode-paint" class="mode-btn" title="Paint mode (B)">🖌 Paint</button>
             </div>
             <button id="btn-grid" class="toolbar-btn" title="Toggle grid (G)">🔲 Grid</button>
+            <button id="btn-new" title="New map (N)">📄 New</button>
             <button id="btn-save" title="Save map (S)" disabled>💾 Save</button>
             <button id="btn-open" title="Open files (O)">📂 Open Files</button>
             <input type="file" id="file-input" multiple accept=".cartile,.json,.png,.jpg,.webp" hidden>
@@ -35,6 +36,7 @@
                 </div>
                 <h3>Shortcuts</h3>
                 <div class="help-section">
+                    <div class="help-row"><kbd>N</kbd> New map</div>
                     <div class="help-row"><kbd>V</kbd> View mode</div>
                     <div class="help-row"><kbd>B</kbd> Paint mode (Brush)</div>
                     <div class="help-row"><kbd>S</kbd> Save</div>
@@ -58,8 +60,8 @@
                     <div id="welcome-overlay">
                         <div class="welcome-content">
                             <h2>cartile editor</h2>
-                            <p>Drop files here to view a tilemap</p>
-                            <p class="hint">Supports: .cartile, Tiled .json + tileset images (.png)</p>
+                            <p>Drop files here to open a tilemap</p>
+                            <p style="margin-top:12px; font-size:13px; color:var(--muted);">or press <kbd style="background:var(--toolbar-bg);padding:2px 6px;border-radius:3px;border:1px solid var(--border);">N</kbd> to create a new map</p>
                         </div>
                     </div>
                 </div>
@@ -109,6 +111,49 @@
             <span id="status-gid">–</span>
             <span id="status-layer">–</span>
             <span id="status-warnings"></span>
+        </div>
+    </div>
+
+    <!-- New Map Modal -->
+    <div id="new-map-modal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <h2>New Map</h2>
+            <div class="form-group">
+                <label for="new-map-name">Name</label>
+                <input type="text" id="new-map-name" value="untitled" />
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="new-map-width">Width (tiles)</label>
+                    <input type="number" id="new-map-width" value="20" min="1" max="999" />
+                </div>
+                <div class="form-group">
+                    <label for="new-map-height">Height (tiles)</label>
+                    <input type="number" id="new-map-height" value="15" min="1" max="999" />
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="new-tile-width">Tile Width (px)</label>
+                    <input type="number" id="new-tile-width" value="16" min="1" max="256" />
+                </div>
+                <div class="form-group">
+                    <label for="new-tile-height">Tile Height (px)</label>
+                    <input type="number" id="new-tile-height" value="16" min="1" max="256" />
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Tileset Image (optional)</label>
+                <div class="file-drop-zone" id="new-tileset-drop">
+                    <span id="new-tileset-label">Drop a PNG here or click to select</span>
+                    <input type="file" id="new-tileset-input" accept=".png,.jpg,.webp" hidden />
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="btn-new-cancel" class="btn-secondary">Cancel</button>
+                <button id="btn-new-create" class="btn-primary">Create</button>
+            </div>
         </div>
     </div>
 
