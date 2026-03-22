@@ -1,8 +1,8 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 // --- Map ---
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct TiledMap {
     pub orientation: String,
     pub width: u32,
@@ -24,7 +24,7 @@ pub struct TiledMap {
 
 // --- Layers ---
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type")]
 pub enum TiledLayer {
     #[serde(rename = "tilelayer")]
@@ -37,7 +37,7 @@ pub enum TiledLayer {
     ImageLayer(TiledImageLayer),
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct TiledTileLayer {
     pub name: String,
     #[serde(default = "default_true")]
@@ -52,7 +52,7 @@ pub struct TiledTileLayer {
     pub properties: Vec<TiledProperty>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct TiledObjectLayer {
     pub name: String,
     #[serde(default = "default_true")]
@@ -65,21 +65,21 @@ pub struct TiledObjectLayer {
     pub properties: Vec<TiledProperty>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct TiledGroupLayer {
     pub name: String,
     #[serde(default)]
     pub layers: Vec<TiledLayer>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct TiledImageLayer {
     pub name: String,
 }
 
 // --- Objects ---
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct TiledObject {
     pub id: u64,
     #[serde(default)]
@@ -107,7 +107,7 @@ pub struct TiledObject {
     pub properties: Vec<TiledProperty>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct TiledPoint {
     pub x: f64,
     pub y: f64,
@@ -115,20 +115,20 @@ pub struct TiledPoint {
 
 // --- Tilesets ---
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum TiledTilesetEntry {
     External(TiledExternalTileset),
     Embedded(TiledTileset),
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct TiledExternalTileset {
     pub firstgid: u32,
     pub source: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct TiledTileset {
     #[serde(default)]
     pub firstgid: u32,
@@ -150,7 +150,7 @@ pub struct TiledTileset {
     pub properties: Vec<TiledProperty>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct TiledTileDef {
     pub id: u32,
     #[serde(default)]
@@ -161,7 +161,7 @@ pub struct TiledTileDef {
 
 // --- Properties ---
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct TiledProperty {
     pub name: String,
     #[serde(rename = "type", default = "default_string_type")]
