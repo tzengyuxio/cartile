@@ -1,5 +1,5 @@
 /* ============================================================
-   cartile viewer — Dark theme
+   cartile editor — Dark theme
    ============================================================ */
 
 :root {
@@ -84,6 +84,61 @@ body {
     text-align: right;
 }
 
+/* ---- Mode toggle ---- */
+
+#mode-toggle {
+    display: flex;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.mode-btn {
+    background: var(--panel-bg);
+    color: var(--muted);
+    border: none;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.mode-btn:not(:last-child) {
+    border-right: 1px solid var(--border);
+}
+
+.mode-btn.active {
+    background: var(--accent);
+    color: #fff;
+}
+
+.mode-btn:hover:not(.active) {
+    background: var(--border);
+    color: var(--text);
+}
+
+/* ---- Save button ---- */
+
+#btn-save {
+    background: var(--panel-bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+#btn-save:hover:not(:disabled) {
+    background: var(--border);
+}
+
+#btn-save:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
 /* ---- Main area ---- */
 
 #main {
@@ -92,9 +147,16 @@ body {
     overflow: hidden;
 }
 
-/* ---- Canvas container ---- */
+/* ---- Canvas area (wraps canvas + tileset panel) ---- */
 
-#canvas-container {
+#canvas-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#canvas-area #canvas-container {
     flex: 1;
     position: relative;
     overflow: hidden;
@@ -146,6 +208,69 @@ body {
 #canvas-container.drag-over .welcome-content {
     border-color: var(--accent);
     background: rgba(88, 166, 255, 0.05);
+}
+
+/* ---- Tileset panel ---- */
+
+#tileset-panel {
+    flex-shrink: 0;
+    background: var(--panel-bg);
+    border-top: 1px solid var(--border);
+}
+
+#tileset-panel.hidden {
+    display: none;
+}
+
+#tileset-panel-header {
+    display: flex;
+    align-items: center;
+    padding: 6px 12px;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+}
+
+#tileset-panel-header h3 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin: 0;
+}
+
+#tileset-select {
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 12px;
+    flex: 1;
+}
+
+#btn-toggle-tileset {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 2px 4px;
+}
+
+#tileset-panel-body {
+    max-height: 180px;
+    overflow: auto;
+    padding: 8px;
+}
+
+#tileset-canvas {
+    cursor: pointer;
+    image-rendering: pixelated;
+}
+
+/* Paint cursor */
+#map-canvas.paint-mode {
+    cursor: crosshair;
 }
 
 /* ---- Side panel ---- */

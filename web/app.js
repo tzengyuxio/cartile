@@ -1,5 +1,5 @@
 // ============================================================
-// cartile viewer — Main application
+// cartile editor — Main application
 // ============================================================
 
 let wasmReady = false;
@@ -21,6 +21,13 @@ let panStart = { x: 0, y: 0 };
 // Canvas and context
 let canvas, ctx;
 
+// Paint mode state
+let currentMode = 'view';       // 'view' | 'paint'
+let selectedTile = null;        // { gid, tilesetIndex, localIndex }
+let activeTilesetIndex = 0;     // which tileset is shown in panel
+let tilesetCanvas, tilesetCtx;  // tileset panel canvas
+let isDirty = false;            // true if map has been modified
+
 // Flip/rotation bitmask constants
 const FLIP_H = 0x80000000;
 const FLIP_V = 0x40000000;
@@ -39,6 +46,9 @@ async function main() {
     canvas = document.getElementById('map-canvas');
     ctx = canvas.getContext('2d');
 
+    tilesetCanvas = document.getElementById('tileset-canvas');
+    tilesetCtx = tilesetCanvas.getContext('2d');
+
     resizeCanvas();
     setupEventListeners();
 
@@ -53,6 +63,194 @@ async function main() {
             'WASM module not loaded. Run: wasm-pack build crates/cartile-wasm --target web --out-dir ../../web/pkg'
         );
     }
+}
+
+// ============================================================
+// Mode Switching
+// ============================================================
+function setMode(mode) {
+    currentMode = mode;
+    document.getElementById('btn-mode-view').classList.toggle('active', mode === 'view');
+    document.getElementById('btn-mode-paint').classList.toggle('active', mode === 'paint');
+    canvas.classList.toggle('paint-mode', mode === 'paint');
+
+    // Show/hide tileset panel
+    const tilesetPanel = document.getElementById('tileset-panel');
+    if (mode === 'paint' && mapData) {
+        tilesetPanel.classList.remove('hidden');
+        renderTilesetPanel();
+    } else {
+        tilesetPanel.classList.add('hidden');
+    }
+    resizeCanvas();
+}
+
+// ============================================================
+// Tileset Panel
+// ============================================================
+function renderTilesetPanel() {
+    if (!mapData || !mapData.tilesets || mapData.tilesets.length === 0) return;
+
+    // Populate tileset select dropdown
+    const select = document.getElementById('tileset-select');
+    select.innerHTML = '';
+    for (let i = 0; i < mapData.tilesets.length; i++) {
+        const ts = mapData.tilesets[i];
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = ts.name || 'Tileset ' + i;
+        select.appendChild(opt);
+    }
+    select.value = activeTilesetIndex;
+
+    renderTilesetCanvas();
+}
+
+function renderTilesetCanvas() {
+    const ts = mapData.tilesets[activeTilesetIndex];
+    if (!ts) return;
+
+    const imagePath = ts.image || '';
+    const basename = imagePath.split('/').pop().toLowerCase();
+    const img = tilesetImages[basename];
+
+    if (!img) {
+        // Show "no image" message
+        tilesetCanvas.width = 200;
+        tilesetCanvas.height = 40;
+        tilesetCtx.fillStyle = '#7d8590';
+        tilesetCtx.font = '12px sans-serif';
+        tilesetCtx.fillText('Tileset image not loaded', 10, 25);
+        return;
+    }
+
+    // Draw tileset image at scaled size for visibility
+    const scale = Math.max(1, Math.floor(64 / (ts.tile_width || 16)));
+    tilesetCanvas.width = img.width * scale;
+    tilesetCanvas.height = img.height * scale;
+    tilesetCtx.imageSmoothingEnabled = false;
+    tilesetCtx.drawImage(img, 0, 0, tilesetCanvas.width, tilesetCanvas.height);
+
+    // Draw grid lines
+    const tw = (ts.tile_width || 16) * scale;
+    const th = (ts.tile_height || 16) * scale;
+    const spacing = (ts.spacing || 0) * scale;
+    const margin = (ts.margin || 0) * scale;
+    const columns = ts.columns || 1;
+    const tileCount = ts.tile_count || 0;
+
+    tilesetCtx.strokeStyle = 'rgba(255,255,255,0.15)';
+    tilesetCtx.lineWidth = 1;
+    for (let i = 0; i < tileCount; i++) {
+        const col = i % columns;
+        const row = Math.floor(i / columns);
+        const x = col * (tw + spacing) + margin;
+        const y = row * (th + spacing) + margin;
+        tilesetCtx.strokeRect(x + 0.5, y + 0.5, tw - 1, th - 1);
+    }
+
+    // Highlight selected tile
+    if (selectedTile && selectedTile.tilesetIndex === activeTilesetIndex) {
+        const col = selectedTile.localIndex % columns;
+        const row = Math.floor(selectedTile.localIndex / columns);
+        const x = col * (tw + spacing) + margin;
+        const y = row * (th + spacing) + margin;
+        tilesetCtx.strokeStyle = '#58a6ff';
+        tilesetCtx.lineWidth = 2;
+        tilesetCtx.strokeRect(x + 1, y + 1, tw - 2, th - 2);
+    }
+}
+
+function handleTilesetClick(e) {
+    if (!mapData || !mapData.tilesets) return;
+    const ts = mapData.tilesets[activeTilesetIndex];
+    if (!ts) return;
+
+    const rect = tilesetCanvas.getBoundingClientRect();
+    const scale = Math.max(1, Math.floor(64 / (ts.tile_width || 16)));
+    const tw = (ts.tile_width || 16) * scale;
+    const th = (ts.tile_height || 16) * scale;
+    const spacing = (ts.spacing || 0) * scale;
+    const margin = (ts.margin || 0) * scale;
+    const columns = ts.columns || 1;
+
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const col = Math.floor((x - margin) / (tw + spacing));
+    const row = Math.floor((y - margin) / (th + spacing));
+    const localIndex = row * columns + col;
+
+    if (localIndex < 0 || localIndex >= (ts.tile_count || 0)) return;
+
+    const firstGid = ts.first_gid || ts.firstgid || 1;
+    selectedTile = {
+        gid: firstGid + localIndex,
+        tilesetIndex: activeTilesetIndex,
+        localIndex: localIndex,
+    };
+
+    renderTilesetCanvas(); // redraw to show selection highlight
+}
+
+// ============================================================
+// Tile Painting
+// ============================================================
+function paintTileAt(e) {
+    const rect = canvas.getBoundingClientRect();
+    const screenX = e.clientX - rect.left;
+    const screenY = e.clientY - rect.top;
+    const { mapX, mapY } = screenToMap(screenX, screenY);
+
+    const grid = mapData.grid || {};
+    const tileWidth = grid.tile_width || 16;
+    const tileHeight = grid.tile_height || 16;
+    const col = Math.floor(mapX / tileWidth);
+    const row = Math.floor(mapY / tileHeight);
+
+    if (col < 0 || row < 0 || col >= (grid.width || 0) || row >= (grid.height || 0)) return;
+
+    // Find the active tile layer (first visible tile layer)
+    const activeLayer = findActiveTileLayer();
+    if (!activeLayer) return;
+
+    const layerWidth = activeLayer.width || grid.width || 0;
+    const idx = row * layerWidth + col;
+
+    if (activeLayer.data[idx] === selectedTile.gid) return; // no change
+
+    activeLayer.data[idx] = selectedTile.gid;
+    isDirty = true;
+    document.getElementById('btn-save').disabled = false;
+    render();
+}
+
+function findActiveTileLayer() {
+    if (!mapData || !mapData.layers) return null;
+    // Use first visible tile layer
+    for (const layer of mapData.layers) {
+        const isTile = layer.type === 'tile' || layer.layer_type === 'tile';
+        if (isTile && layerVisibility[layer.name]) {
+            return layer;
+        }
+    }
+    return null;
+}
+
+// ============================================================
+// Save
+// ============================================================
+function saveMap() {
+    if (!mapData) return;
+    const json = JSON.stringify(mapData, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (mapData.name || 'map') + '.cartile';
+    a.click();
+    URL.revokeObjectURL(url);
+    isDirty = false;
 }
 
 // ============================================================
@@ -144,6 +342,8 @@ function loadImageFile(file) {
 function loadMap(map) {
     mapData = map;
     hoveredTile = null;
+    isDirty = false;
+    document.getElementById('btn-save').disabled = true;
 
     console.log('Map loaded:', map.name, 'grid:', map.grid);
     console.log('Loaded tileset images:', Object.keys(tilesetImages));
@@ -176,6 +376,16 @@ function loadMap(map) {
     camera.y = 0;
     camera.zoom = 1.0;
     updateZoomDisplay();
+
+    // Reset paint state
+    activeTilesetIndex = 0;
+    selectedTile = null;
+
+    // If already in paint mode, show tileset panel
+    if (currentMode === 'paint') {
+        document.getElementById('tileset-panel').classList.remove('hidden');
+        renderTilesetPanel();
+    }
 
     render();
 }
@@ -351,7 +561,14 @@ function findTilesetForGid(gid) {
 // Camera (Pan / Zoom)
 // ============================================================
 function handleMouseDown(e) {
-    if (e.button === 0 || e.button === 1) {
+    // Paint mode: left click paints a tile
+    if (currentMode === 'paint' && e.button === 0 && selectedTile && mapData) {
+        paintTileAt(e);
+        return;
+    }
+
+    // Pan with left click in view mode, or middle mouse in any mode
+    if ((e.button === 0 && currentMode === 'view') || e.button === 1) {
         isPanning = true;
         panStart.x = e.clientX;
         panStart.y = e.clientY;
@@ -360,6 +577,11 @@ function handleMouseDown(e) {
 }
 
 function handleMouseMove(e) {
+    // Paint on drag in paint mode
+    if (currentMode === 'paint' && e.buttons === 1 && selectedTile && mapData && !isPanning) {
+        paintTileAt(e);
+    }
+
     if (isPanning) {
         const dx = e.clientX - panStart.x;
         const dy = e.clientY - panStart.y;
@@ -381,7 +603,11 @@ function handleMouseMove(e) {
 
 function handleMouseUp() {
     isPanning = false;
-    canvas.style.cursor = 'default';
+    if (currentMode === 'paint') {
+        canvas.style.cursor = 'crosshair';
+    } else {
+        canvas.style.cursor = 'default';
+    }
 }
 
 function handleWheel(e) {
@@ -665,6 +891,29 @@ function setupEventListeners() {
 
     // Resize
     window.addEventListener('resize', resizeCanvas);
+
+    // Mode toggle
+    document.getElementById('btn-mode-view').addEventListener('click', () => setMode('view'));
+    document.getElementById('btn-mode-paint').addEventListener('click', () => setMode('paint'));
+
+    // Save
+    document.getElementById('btn-save').addEventListener('click', saveMap);
+
+    // Tileset panel click
+    tilesetCanvas.addEventListener('click', handleTilesetClick);
+
+    // Tileset select change
+    document.getElementById('tileset-select').addEventListener('change', (e) => {
+        activeTilesetIndex = parseInt(e.target.value, 10);
+        selectedTile = null;
+        renderTilesetCanvas();
+    });
+
+    // Toggle tileset panel body visibility
+    document.getElementById('btn-toggle-tileset').addEventListener('click', () => {
+        const body = document.getElementById('tileset-panel-body');
+        body.style.display = body.style.display === 'none' ? '' : 'none';
+    });
 }
 
 // ============================================================

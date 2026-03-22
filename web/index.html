@@ -3,15 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>cartile viewer</title>
+    <title>cartile editor</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="app">
         <!-- Toolbar -->
         <div id="toolbar">
-            <span class="app-name">cartile viewer</span>
+            <span class="app-name">cartile editor</span>
             <div class="toolbar-spacer"></div>
+            <div id="mode-toggle">
+                <button id="btn-mode-view" class="mode-btn active" title="View mode">👁 View</button>
+                <button id="btn-mode-paint" class="mode-btn" title="Paint mode">🖌 Paint</button>
+            </div>
+            <button id="btn-save" title="Save map" disabled>💾 Save</button>
             <button id="btn-open" title="Open files">📂 Open Files</button>
             <input type="file" id="file-input" multiple accept=".cartile,.json,.png,.jpg,.webp" hidden>
             <span id="zoom-display">100%</span>
@@ -19,15 +24,27 @@
 
         <!-- Main area -->
         <div id="main">
-            <!-- Canvas -->
-            <div id="canvas-container">
-                <canvas id="map-canvas"></canvas>
-                <!-- Welcome / drop zone overlay -->
-                <div id="welcome-overlay">
-                    <div class="welcome-content">
-                        <h2>cartile viewer</h2>
-                        <p>Drop files here to view a tilemap</p>
-                        <p class="hint">Supports: .cartile, Tiled .json + tileset images (.png)</p>
+            <!-- Canvas area (wraps canvas + tileset panel) -->
+            <div id="canvas-area">
+                <div id="canvas-container">
+                    <canvas id="map-canvas"></canvas>
+                    <!-- Welcome / drop zone overlay -->
+                    <div id="welcome-overlay">
+                        <div class="welcome-content">
+                            <h2>cartile editor</h2>
+                            <p>Drop files here to view a tilemap</p>
+                            <p class="hint">Supports: .cartile, Tiled .json + tileset images (.png)</p>
+                        </div>
+                    </div>
+                </div>
+                <div id="tileset-panel" class="hidden">
+                    <div id="tileset-panel-header">
+                        <h3>Tileset</h3>
+                        <select id="tileset-select"></select>
+                        <button id="btn-toggle-tileset" title="Toggle tileset panel">▼</button>
+                    </div>
+                    <div id="tileset-panel-body">
+                        <canvas id="tileset-canvas"></canvas>
                     </div>
                 </div>
             </div>
