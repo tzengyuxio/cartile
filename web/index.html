@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>cartile viewer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Toolbar -->
+        <div id="toolbar">
+            <span class="app-name">cartile viewer</span>
+            <div class="toolbar-spacer"></div>
+            <button id="btn-open" title="Open files">📂 Open Files</button>
+            <input type="file" id="file-input" multiple accept=".cartile,.json,.png,.jpg,.webp" hidden>
+            <span id="zoom-display">100%</span>
+        </div>
+
+        <!-- Main area -->
+        <div id="main">
+            <!-- Canvas -->
+            <div id="canvas-container">
+                <canvas id="map-canvas"></canvas>
+                <!-- Welcome / drop zone overlay -->
+                <div id="welcome-overlay">
+                    <div class="welcome-content">
+                        <h2>cartile viewer</h2>
+                        <p>Drop files here to view a tilemap</p>
+                        <p class="hint">Supports: .cartile, Tiled .json + tileset images (.png)</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Side panel -->
+            <div id="side-panel">
+                <div class="panel-section">
+                    <h3>Layers</h3>
+                    <div id="layer-list"></div>
+                </div>
+                <div class="panel-section">
+                    <h3>Map Info</h3>
+                    <div id="map-info"></div>
+                </div>
+                <div class="panel-section">
+                    <h3>Tile Properties</h3>
+                    <div id="tile-props">
+                        <span class="hint">Hover over a tile</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status bar -->
+        <div id="status-bar">
+            <span id="status-cursor">–</span>
+            <span id="status-gid">–</span>
+            <span id="status-layer">–</span>
+            <span id="status-warnings"></span>
+        </div>
+    </div>
+
+    <!-- Error toast -->
+    <div id="toast" class="hidden"></div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,293 @@
+/* ============================================================
+   cartile viewer — Dark theme
+   ============================================================ */
+
+:root {
+    --bg: #0d1117;
+    --panel-bg: #161b22;
+    --toolbar-bg: #1c2128;
+    --text: #e6edf3;
+    --muted: #7d8590;
+    --accent: #58a6ff;
+    --border: #30363d;
+    --error: #da3633;
+    --error-bg: #4a1c1b;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+}
+
+/* ---- App layout ---- */
+
+#app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100vw;
+}
+
+/* ---- Toolbar ---- */
+
+#toolbar {
+    display: flex;
+    align-items: center;
+    height: 40px;
+    padding: 0 12px;
+    background: var(--toolbar-bg);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    gap: 8px;
+}
+
+.app-name {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--accent);
+    letter-spacing: 0.5px;
+}
+
+.toolbar-spacer {
+    flex: 1;
+}
+
+#btn-open {
+    background: var(--panel-bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+#btn-open:hover {
+    background: var(--border);
+}
+
+#zoom-display {
+    font-size: 13px;
+    color: var(--muted);
+    min-width: 50px;
+    text-align: right;
+}
+
+/* ---- Main area ---- */
+
+#main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* ---- Canvas container ---- */
+
+#canvas-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: var(--bg);
+}
+
+#map-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+/* ---- Welcome overlay ---- */
+
+#welcome-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+#welcome-overlay.hidden {
+    display: none;
+}
+
+.welcome-content {
+    text-align: center;
+    padding: 48px 64px;
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    pointer-events: none;
+}
+
+.welcome-content h2 {
+    font-size: 20px;
+    color: var(--text);
+    margin-bottom: 8px;
+}
+
+.welcome-content p {
+    font-size: 14px;
+    color: var(--muted);
+    margin-top: 4px;
+}
+
+/* Drag-over highlight */
+#canvas-container.drag-over .welcome-content {
+    border-color: var(--accent);
+    background: rgba(88, 166, 255, 0.05);
+}
+
+/* ---- Side panel ---- */
+
+#side-panel {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--panel-bg);
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.panel-section {
+    padding: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.panel-section h3 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 8px;
+}
+
+/* ---- Layer list ---- */
+
+.layer-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 0;
+    font-size: 13px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.layer-item:hover {
+    color: var(--accent);
+}
+
+.layer-item.hidden-layer {
+    opacity: 0.4;
+}
+
+.layer-item input[type="checkbox"] {
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
+.layer-type {
+    font-size: 11px;
+    color: var(--muted);
+}
+
+/* ---- Map info ---- */
+
+#map-info {
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+#map-info .info-label {
+    color: var(--muted);
+}
+
+/* ---- Tile properties ---- */
+
+#tile-props {
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+#tile-props .prop-key {
+    color: var(--muted);
+}
+
+#tile-props .prop-value {
+    color: var(--text);
+}
+
+.hint {
+    font-size: 12px;
+    color: var(--muted);
+    font-style: italic;
+}
+
+/* ---- Status bar ---- */
+
+#status-bar {
+    display: flex;
+    align-items: center;
+    height: 24px;
+    padding: 0 12px;
+    background: var(--toolbar-bg);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+    gap: 16px;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+/* ---- Toast ---- */
+
+#toast {
+    position: fixed;
+    top: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--error-bg);
+    color: #f85149;
+    border: 1px solid var(--error);
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 13px;
+    z-index: 1000;
+    max-width: 500px;
+    text-align: center;
+    transition: opacity 0.3s;
+}
+
+#toast.hidden {
+    display: none;
+}
+
+/* ---- Scrollbar styling ---- */
+
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--muted);
+}
