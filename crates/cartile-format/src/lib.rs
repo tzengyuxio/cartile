@@ -1,8 +1,10 @@
+pub mod autotile;
 pub mod error;
 pub mod tile_id;
 pub mod types;
 mod validate;
 
+pub use autotile::{AutoTileIndex, build_autotile_index, resolve_autotiles};
 pub use error::{CartileError, ValidationError};
 pub use tile_id::TileId;
 pub use types::grid::*;
