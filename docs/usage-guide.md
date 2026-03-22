@@ -195,13 +195,32 @@ Undo/redo tracks individual tile changes (paint and erase). History is cleared w
 | `Ctrl+Z` | Undo |
 | `Ctrl+Y` | Redo |
 
+### Isometric Maps
+
+The editor supports isometric projection rendering. Isometric maps display tiles in a diamond pattern. All interactions (painting, erasing, hovering) work correctly in isometric mode. Grid overlay shows diamond-shaped lines.
+
+Maps with `grid.projection.type: "isometric"` are automatically rendered in isometric mode. The Map Info panel shows the current projection type.
+
+### Object Layer Rendering
+
+Object layers are rendered on the canvas with semi-transparent blue overlays:
+- **Point**: Circle marker + crosshair + name label
+- **Rect**: Semi-transparent rectangle with border
+- **Ellipse**: Semi-transparent ellipse
+- **Polygon**: Filled closed polygon
+- **Polyline**: Stroked open path
+
+Object rendering respects layer visibility toggles. Objects are not editable in the current version.
+
+### Auto-tiling
+
+When painting in Paint mode, if the selected tile belongs to an auto-tile group (defined in the tileset), the editor automatically updates the painted tile and its 8 neighbors to use the correct bitmask variant. This works for both `bitmask_4bit` and `bitmask_8bit` rules.
+
 ### Limitations (current version)
 
-- **Orthogonal only**: Isometric and hexagonal rendering not yet supported in the editor.
-- **No object layer editing**: Object layers are listed in the panel but cannot be edited or rendered on canvas.
-- **No auto-tiling in editor**: Auto-tile rules are not applied during painting (use the CLI or library API to resolve auto-tiles).
+- **Hexagonal rendering**: Not yet supported in the editor.
+- **No object layer editing**: Objects are displayed but cannot be created, moved, or modified.
 - **Single session**: No persistent storage — reload the page and your changes are lost unless saved.
-- **No new map creation**: You must load an existing file (or convert from Tiled/LDtk).
 
 ---
 
