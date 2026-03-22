@@ -146,3 +146,46 @@ fn convert_infinite_map_errors() {
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("infinite"));
 }
+
+#[test]
+fn convert_external_tileset_to_file() {
+    let tiled = load_tiled("external_tileset.json");
+    let temp_dir = std::env::temp_dir().join("cartile_test_external_ts");
+    let _ = std::fs::remove_dir_all(&temp_dir);
+    std::fs::create_dir_all(&temp_dir).unwrap();
+
+    let (map, _warnings) = convert_tiled_map(
+        &tiled,
+        "ext",
+        Path::new("tests/fixtures"),
+        Some(temp_dir.as_path()),
+    )
+    .unwrap();
+
+    // Should have an ExternalRef entry
+    assert_eq!(map.tilesets.len(), 1);
+    match &map.tilesets[0] {
+        TilesetEntry::ExternalRef(r) => {
+            assert_eq!(r.ref_path, "./terrain.cartile-ts");
+            assert_eq!(r.first_gid, 1);
+        }
+        _ => panic!("expected external ref tileset"),
+    }
+
+    // Verify the .cartile-ts file was written
+    let ts_path = temp_dir.join("terrain.cartile-ts");
+    assert!(ts_path.exists(), "tileset file should exist on disk");
+
+    // Verify it can be parsed as TilesetFile
+    let ts_json = std::fs::read_to_string(&ts_path).unwrap();
+    let ts_file: TilesetFile = serde_json::from_str(&ts_json).unwrap();
+    assert_eq!(ts_file.cartile, "0.1.0");
+    assert_eq!(ts_file.file_type, "tileset");
+    assert_eq!(ts_file.tileset.name, "terrain");
+    assert_eq!(ts_file.tileset.tile_count, 16);
+    // Standalone file should not have first_gid
+    assert_eq!(ts_file.tileset.first_gid, 0);
+
+    // Cleanup
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}

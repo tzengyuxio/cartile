@@ -5,7 +5,7 @@ use anyhow::Context;
 use cartile_format::{
     CartileMap, Grid, GridType, HeightMode, HexOrientation, Layer, MapObject, ObjectLayer, Point,
     Projection, ProjectionType, Properties, Property, PropertyType, Shape, Stagger, StaggerAxis,
-    StaggerIndex, TileId, TileLayer, Tileset, TilesetEntry, Topology,
+    StaggerIndex, TileId, TileLayer, Tileset, TilesetEntry, TilesetFile, TilesetRef, Topology,
 };
 
 use super::types::{
@@ -244,7 +244,7 @@ fn parse_stagger(tiled: &TiledMap) -> anyhow::Result<Stagger> {
 fn convert_tilesets(
     tiled: &TiledMap,
     input_dir: &Path,
-    _output_dir: Option<&Path>,
+    output_dir: Option<&Path>,
     warnings: &mut Vec<String>,
 ) -> anyhow::Result<Vec<TilesetEntry>> {
     let mut result = Vec::new();
@@ -257,7 +257,7 @@ fn convert_tilesets(
                 result.push(TilesetEntry::Inline(cartile_ts));
             }
             TiledTilesetEntry::External(ext) => {
-                // Load and inline the external .tsj file
+                // Load the external .tsj file
                 let ts_path = input_dir.join(&ext.source);
                 let json = std::fs::read_to_string(&ts_path)
                     .with_context(|| format!("failed to read tileset '{}'", ts_path.display()))?;
@@ -267,7 +267,40 @@ fn convert_tilesets(
                 tiled_ts.firstgid = ext.firstgid;
                 let (cartile_ts, ts_warnings) = convert_tileset(&tiled_ts);
                 warnings.extend(ts_warnings);
-                result.push(TilesetEntry::Inline(cartile_ts));
+
+                if let Some(dir) = output_dir {
+                    // Write as standalone .cartile-ts file and reference it
+                    let ts_filename = format!("{}.cartile-ts", cartile_ts.name);
+                    let ts_out_path = dir.join(&ts_filename);
+
+                    let ts_file = TilesetFile {
+                        cartile: "0.1.0".to_string(),
+                        file_type: "tileset".to_string(),
+                        tileset: Tileset {
+                            // Standalone files don't include first_gid
+                            first_gid: 0,
+                            ..cartile_ts.clone()
+                        },
+                    };
+                    let file = std::fs::File::create(&ts_out_path).with_context(|| {
+                        format!("failed to write tileset file '{}'", ts_out_path.display())
+                    })?;
+                    let writer = std::io::BufWriter::new(file);
+                    serde_json::to_writer_pretty(writer, &ts_file).with_context(|| {
+                        format!(
+                            "failed to serialize tileset file '{}'",
+                            ts_out_path.display()
+                        )
+                    })?;
+
+                    result.push(TilesetEntry::ExternalRef(TilesetRef {
+                        ref_path: format!("./{ts_filename}"),
+                        first_gid: cartile_ts.first_gid,
+                    }));
+                } else {
+                    // Inline the tileset
+                    result.push(TilesetEntry::Inline(cartile_ts));
+                }
             }
         }
     }
