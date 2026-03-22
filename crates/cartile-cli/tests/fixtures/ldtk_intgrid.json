@@ -1,0 +1,36 @@
+{
+    "__header__": {
+        "app": "LDtk",
+        "appAuthor": "Sebastien Benard",
+        "appVersion": "1.5.3",
+        "url": "https://ldtk.io"
+    },
+    "jsonVersion": "1.5.3",
+    "defaultGridSize": 16,
+    "defs": {
+        "tilesets": []
+    },
+    "worlds": [],
+    "levels": [
+        {
+            "identifier": "IntGrid_Level",
+            "uid": 200,
+            "pxWid": 48,
+            "pxHei": 32,
+            "layerInstances": [
+                {
+                    "__type": "IntGrid",
+                    "__identifier": "Collision",
+                    "__cWid": 3,
+                    "__cHei": 2,
+                    "__gridSize": 16,
+                    "__tilesetDefUid": null,
+                    "gridTiles": [],
+                    "autoLayerTiles": [],
+                    "intGridCsv": [1, 0, 1, 0, 2, 0],
+                    "entityInstances": []
+                }
+            ]
+        }
+    ]
+}
