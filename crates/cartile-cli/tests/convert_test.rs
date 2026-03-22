@@ -53,3 +53,29 @@ fn convert_orthogonal_map() {
 
     map.validate().unwrap();
 }
+
+#[test]
+fn convert_object_layer() {
+    let tiled = load_tiled("with_objects.json");
+    let (map, _) =
+        convert_tiled_map(&tiled, "objects", Path::new("tests/fixtures"), None).unwrap();
+
+    assert_eq!(map.layers.len(), 2);
+    match &map.layers[1] {
+        Layer::Object(ol) => {
+            assert_eq!(ol.objects.len(), 5);
+            assert_eq!(ol.objects[0].shape, cartile_format::types::object::Shape::Point);
+            assert_eq!(ol.objects[0].id, 1);
+            assert_eq!(ol.objects[0].name, "spawn");
+            assert_eq!(ol.objects[1].shape, cartile_format::types::object::Shape::Rect);
+            assert_eq!(ol.objects[1].rotation, 45.0);
+            assert_eq!(ol.objects[2].shape, cartile_format::types::object::Shape::Ellipse);
+            assert_eq!(ol.objects[3].shape, cartile_format::types::object::Shape::Polyline);
+            assert_eq!(ol.objects[3].points.as_ref().unwrap().len(), 3);
+            assert_eq!(ol.objects[4].shape, cartile_format::types::object::Shape::Polygon);
+            assert_eq!(ol.objects[4].points.as_ref().unwrap().len(), 4);
+        }
+        _ => panic!("expected object layer"),
+    }
+    map.validate().unwrap();
+}
