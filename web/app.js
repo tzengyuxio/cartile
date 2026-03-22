@@ -51,6 +51,10 @@ const FLIP_V = 0x40000000;
 const FLIP_D = 0x20000000;
 const GID_MASK = 0x1FFFFFFF;
 
+// Auto-tile index: built once per map load
+let autoTileIndex = {};  // group -> { rule, firstGid, variants: { bitmask -> localTileId }, fallback }
+let tileToGroup = {};    // gid -> { group, rule, tilesetIndex }
+
 // Zoom limits
 const ZOOM_MIN = 0.25;
 const ZOOM_MAX = 4.0;
@@ -224,6 +228,144 @@ function handleTilesetClick(e) {
 }
 
 // ============================================================
+// Auto-tile helpers (JS-side bitmask computation for live painting)
+// ============================================================
+
+/**
+ * Build auto-tile lookup tables from tileset definitions.
+ * Must be called after mapData is set (in loadMap / createNewMap).
+ */
+function buildAutoTileIndex() {
+    autoTileIndex = {};
+    tileToGroup = {};
+
+    if (!mapData || !mapData.tilesets) return;
+
+    for (let tsIdx = 0; tsIdx < mapData.tilesets.length; tsIdx++) {
+        const ts = mapData.tilesets[tsIdx];
+        if (!ts.tiles) continue;
+
+        const firstGid = ts.first_gid || ts.firstgid || 1;
+
+        for (const [localIdStr, tileData] of Object.entries(ts.tiles)) {
+            if (!tileData.auto_tile) continue;
+
+            const at = tileData.auto_tile;
+            const localId = parseInt(localIdStr, 10);
+            const gid = firstGid + localId;
+
+            // Register this tile's group membership
+            tileToGroup[gid] = {
+                group: at.group,
+                rule: at.rule,
+                tilesetIndex: tsIdx,
+            };
+
+            // Build the group's variant lookup
+            if (!autoTileIndex[at.group]) {
+                autoTileIndex[at.group] = {
+                    rule: at.rule,
+                    firstGid: firstGid,
+                    variants: {},
+                    fallback: null,
+                };
+            }
+            autoTileIndex[at.group].variants[at.bitmask] = localId;
+            if (at.bitmask === 0) {
+                autoTileIndex[at.group].fallback = localId;
+            }
+        }
+    }
+}
+
+/** Return auto-tile group info for the tile at (col, row), or null. */
+function getTileGroupAt(layer, col, row, gridWidth) {
+    const idx = row * gridWidth + col;
+    const raw = layer.data[idx];
+    if (!raw || raw === 0) return null;
+    const gid = raw & GID_MASK;  // strip flip flags
+    return tileToGroup[gid] || null;
+}
+
+/** Compute the bitmask for a tile at (col, row) given its group and rule. */
+function computeBitmask(layer, col, row, group, rule, grid) {
+    const w = grid.width || 0;
+    const h = grid.height || 0;
+
+    function isConnected(c, r) {
+        if (c < 0 || r < 0 || c >= w || r >= h) return false;
+        const info = getTileGroupAt(layer, c, r, w);
+        return info !== null && info.group === group;
+    }
+
+    if (rule === 'bitmask_4bit') {
+        let mask = 0;
+        if (isConnected(col, row - 1)) mask |= 1;   // N
+        if (isConnected(col + 1, row)) mask |= 2;   // E
+        if (isConnected(col, row + 1)) mask |= 4;   // S
+        if (isConnected(col - 1, row)) mask |= 8;   // W
+        return mask;
+    }
+
+    if (rule === 'bitmask_8bit') {
+        const n = isConnected(col, row - 1);
+        const e = isConnected(col + 1, row);
+        const s = isConnected(col, row + 1);
+        const w2 = isConnected(col - 1, row);
+
+        let mask = 0;
+        if (n && w2 && isConnected(col - 1, row - 1)) mask |= 1;   // NW
+        if (n) mask |= 2;                                            // N
+        if (n && e && isConnected(col + 1, row - 1)) mask |= 4;    // NE
+        if (w2) mask |= 8;                                           // W
+        if (e) mask |= 16;                                           // E
+        if (s && w2 && isConnected(col - 1, row + 1)) mask |= 32;  // SW
+        if (s) mask |= 64;                                           // S
+        if (s && e && isConnected(col + 1, row + 1)) mask |= 128;  // SE
+        return mask;
+    }
+
+    return 0;
+}
+
+/**
+ * Update auto-tiles for the painted tile and all 8 neighbors.
+ * Mutates layer.data in place. Does NOT push undo entries for
+ * neighbor changes (MVP simplification).
+ */
+function updateAutoTilesAround(layer, col, row, grid) {
+    const w = grid.width || 0;
+    const h = grid.height || 0;
+
+    for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+            const c = col + dx;
+            const r = row + dy;
+            if (c < 0 || r < 0 || c >= w || r >= h) continue;
+
+            const info = getTileGroupAt(layer, c, r, w);
+            if (!info) continue;
+
+            const groupData = autoTileIndex[info.group];
+            if (!groupData) continue;
+
+            const bitmask = computeBitmask(layer, c, r, info.group, info.rule, grid);
+            let newLocalId = groupData.variants[bitmask];
+            if (newLocalId === undefined) {
+                newLocalId = groupData.fallback;
+            }
+            if (newLocalId === undefined) continue;
+
+            const idx = r * w + c;
+            const oldRaw = layer.data[idx];
+            const flags = (oldRaw >>> 0) & 0xE0000000;  // preserve flip flags
+            const newGid = groupData.firstGid + newLocalId;
+            layer.data[idx] = (flags | newGid) >>> 0;
+        }
+    }
+}
+
+// ============================================================
 // Tile Painting
 // ============================================================
 function paintTileAt(e) {
@@ -254,6 +396,10 @@ function paintTileAt(e) {
     pushUndo(layerIndex, idx, activeLayer.data[idx]);
 
     activeLayer.data[idx] = selectedTile.gid;
+
+    // Live auto-tiling: update painted tile + neighbors
+    updateAutoTilesAround(activeLayer, col, row, grid);
+
     isDirty = true;
     document.getElementById('btn-save').disabled = false;
     render();
@@ -286,6 +432,10 @@ function eraseTileAt(e) {
     pushUndo(layerIndex, idx, activeLayer.data[idx]);
 
     activeLayer.data[idx] = 0;
+
+    // Live auto-tiling: update neighbors after erasing
+    updateAutoTilesAround(activeLayer, col, row, grid);
+
     isDirty = true;
     document.getElementById('btn-save').disabled = false;
     render();
@@ -571,6 +721,9 @@ function loadMap(map) {
     // Clear undo/redo stacks on new map load
     undoStack = [];
     redoStack = [];
+
+    // Build auto-tile lookup tables for live painting
+    buildAutoTileIndex();
 
     // Hide welcome overlay
     document.getElementById('welcome-overlay').classList.add('hidden');
