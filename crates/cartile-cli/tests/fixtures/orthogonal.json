@@ -1,0 +1,43 @@
+{
+    "type": "map",
+    "version": "1.10",
+    "tiledversion": "1.11.2",
+    "orientation": "orthogonal",
+    "renderorder": "right-down",
+    "width": 3,
+    "height": 2,
+    "tilewidth": 32,
+    "tileheight": 32,
+    "infinite": false,
+    "nextlayerid": 3,
+    "nextobjectid": 1,
+    "layers": [
+        {
+            "id": 1,
+            "name": "ground",
+            "type": "tilelayer",
+            "width": 3,
+            "height": 2,
+            "x": 0,
+            "y": 0,
+            "visible": true,
+            "opacity": 1.0,
+            "data": [1, 2, 3, 1, 2, 3]
+        }
+    ],
+    "tilesets": [
+        {
+            "firstgid": 1,
+            "name": "terrain",
+            "tilewidth": 32,
+            "tileheight": 32,
+            "tilecount": 16,
+            "columns": 4,
+            "image": "terrain.png",
+            "imagewidth": 128,
+            "imageheight": 128,
+            "margin": 0,
+            "spacing": 0
+        }
+    ]
+}

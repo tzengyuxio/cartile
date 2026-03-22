@@ -1,0 +1,44 @@
+{
+    "type": "map",
+    "version": "1.10",
+    "tiledversion": "1.11.2",
+    "orientation": "hexagonal",
+    "renderorder": "right-down",
+    "width": 3,
+    "height": 3,
+    "tilewidth": 32,
+    "tileheight": 28,
+    "hexsidelength": 14,
+    "staggeraxis": "y",
+    "staggerindex": "odd",
+    "infinite": false,
+    "layers": [
+        {
+            "id": 1,
+            "name": "ground",
+            "type": "tilelayer",
+            "width": 3,
+            "height": 3,
+            "x": 0,
+            "y": 0,
+            "visible": true,
+            "opacity": 1.0,
+            "data": [1, 2, 3, 1, 2, 3, 1, 2, 3]
+        }
+    ],
+    "tilesets": [
+        {
+            "firstgid": 1,
+            "name": "hex_terrain",
+            "tilewidth": 32,
+            "tileheight": 28,
+            "tilecount": 9,
+            "columns": 3,
+            "image": "hex_terrain.png",
+            "imagewidth": 96,
+            "imageheight": 84,
+            "margin": 0,
+            "spacing": 0
+        }
+    ]
+}
