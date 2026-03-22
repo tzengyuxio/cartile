@@ -44,16 +44,14 @@ fn validate_grid(map: &CartileMap) -> Result<(), ValidationError> {
     }
 
     match grid.projection.projection_type {
-        ProjectionType::Oblique => {
-            match grid.projection.angle {
-                None => return Err(ValidationError::MissingObliqueAngle),
-                Some(angle) => {
-                    if angle <= 0.0 || angle >= 90.0 {
-                        return Err(ValidationError::ObliqueAngleOutOfRange { angle });
-                    }
+        ProjectionType::Oblique => match grid.projection.angle {
+            None => return Err(ValidationError::MissingObliqueAngle),
+            Some(angle) => {
+                if angle <= 0.0 || angle >= 90.0 {
+                    return Err(ValidationError::ObliqueAngleOutOfRange { angle });
                 }
             }
-        }
+        },
         _ => {
             if grid.projection.angle.is_some() {
                 return Err(ValidationError::UnexpectedProjectionAngle);
@@ -83,10 +81,7 @@ fn tileset_ranges(map: &CartileMap) -> Result<Vec<(String, u32, u32)>, Validatio
         };
 
         if first_gid < 1 {
-            return Err(ValidationError::InvalidFirstGid {
-                name,
-                first_gid,
-            });
+            return Err(ValidationError::InvalidFirstGid { name, first_gid });
         }
 
         // last_gid = first_gid + tile_count - 1 (tile_count >= 1 assumed for inline)
@@ -280,12 +275,12 @@ fn validate_height_mode(map: &CartileMap) -> Result<(), ValidationError> {
     // Non-stepped height mode: no tile layer may have non-zero elevation.
     if height_mode != HeightMode::Stepped {
         for layer in &map.layers {
-            if let Layer::Tile(tl) = layer {
-                if tl.elevation != 0 {
-                    return Err(ValidationError::UnexpectedElevation {
-                        name: tl.name.clone(),
-                    });
-                }
+            if let Layer::Tile(tl) = layer
+                && tl.elevation != 0
+            {
+                return Err(ValidationError::UnexpectedElevation {
+                    name: tl.name.clone(),
+                });
             }
         }
     }

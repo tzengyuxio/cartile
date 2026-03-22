@@ -60,7 +60,11 @@ fn invalid_data_length() {
         opacity: 1.0,
         elevation: 0,
         encoding: "dense".to_string(),
-        data: vec![TileId::new(1, false, false, false), TileId::new(2, false, false, false), TileId::new(3, false, false, false)],
+        data: vec![
+            TileId::new(1, false, false, false),
+            TileId::new(2, false, false, false),
+            TileId::new(3, false, false, false),
+        ],
         properties: Default::default(),
     })];
     let err = map.validate().unwrap_err();
@@ -90,7 +94,12 @@ fn duplicate_layer_name() {
         opacity: 1.0,
         elevation: 0,
         encoding: "dense".to_string(),
-        data: vec![TileId::new(1, false, false, false), TileId::new(2, false, false, false), TileId::new(3, false, false, false), TileId::new(4, false, false, false)],
+        data: vec![
+            TileId::new(1, false, false, false),
+            TileId::new(2, false, false, false),
+            TileId::new(3, false, false, false),
+            TileId::new(4, false, false, false),
+        ],
         properties: Default::default(),
     };
     map.layers = vec![Layer::Tile(layer.clone()), Layer::Tile(layer)];
@@ -107,7 +116,8 @@ fn duplicate_layer_name() {
 
 #[test]
 fn hex_missing_orientation() {
-    let mut map: CartileMap = serde_json::from_str(r#"{
+    let mut map: CartileMap = serde_json::from_str(
+        r#"{
         "cartile": "0.1.0",
         "type": "map",
         "name": "test",
@@ -121,7 +131,9 @@ fn hex_missing_orientation() {
             "projection": { "type": "orthogonal" }
         },
         "layers": []
-    }"#).unwrap();
+    }"#,
+    )
+    .unwrap();
     // Ensure orientation is absent.
     map.grid.orientation = None;
     let err = map.validate().unwrap_err();
@@ -134,7 +146,8 @@ fn hex_missing_orientation() {
 
 #[test]
 fn hex_missing_stagger() {
-    let map: CartileMap = serde_json::from_str(r#"{
+    let map: CartileMap = serde_json::from_str(
+        r#"{
         "cartile": "0.1.0",
         "type": "map",
         "name": "test",
@@ -148,7 +161,9 @@ fn hex_missing_stagger() {
             "projection": { "type": "orthogonal" }
         },
         "layers": []
-    }"#).unwrap();
+    }"#,
+    )
+    .unwrap();
     let err = map.validate().unwrap_err();
     assert_eq!(err, ValidationError::MissingHexStagger);
 }
@@ -159,7 +174,8 @@ fn hex_missing_stagger() {
 
 #[test]
 fn stepped_elevation_ok() {
-    let map: CartileMap = serde_json::from_str(r#"{
+    let map: CartileMap = serde_json::from_str(
+        r#"{
         "cartile": "0.1.0",
         "type": "map",
         "name": "test",
@@ -178,7 +194,9 @@ fn stepped_elevation_ok() {
             "elevation": 1,
             "data": [1, 2, 3, 4]
         }]
-    }"#).unwrap();
+    }"#,
+    )
+    .unwrap();
     assert!(map.validate().is_ok());
 }
 
@@ -188,7 +206,8 @@ fn stepped_elevation_ok() {
 
 #[test]
 fn unexpected_elevation() {
-    let map: CartileMap = serde_json::from_str(r#"{
+    let map: CartileMap = serde_json::from_str(
+        r#"{
         "cartile": "0.1.0",
         "type": "map",
         "name": "test",
@@ -206,7 +225,9 @@ fn unexpected_elevation() {
             "elevation": 2,
             "data": [1, 2, 3, 4]
         }]
-    }"#).unwrap();
+    }"#,
+    )
+    .unwrap();
     let err = map.validate().unwrap_err();
     assert!(
         matches!(err, ValidationError::UnexpectedElevation { ref name } if name == "ground"),
@@ -220,7 +241,8 @@ fn unexpected_elevation() {
 
 #[test]
 fn vertex_needs_heightmap() {
-    let map: CartileMap = serde_json::from_str(r#"{
+    let map: CartileMap = serde_json::from_str(
+        r#"{
         "cartile": "0.1.0",
         "type": "map",
         "name": "test",
@@ -238,7 +260,9 @@ fn vertex_needs_heightmap() {
             "name": "ground",
             "data": [1, 2, 3, 4]
         }]
-    }"#).unwrap();
+    }"#,
+    )
+    .unwrap();
     let err = map.validate().unwrap_err();
     assert_eq!(err, ValidationError::MissingHeightmapLayer);
 }
@@ -249,7 +273,8 @@ fn vertex_needs_heightmap() {
 
 #[test]
 fn overlapping_gid_ranges() {
-    let map: CartileMap = serde_json::from_str(r#"{
+    let map: CartileMap = serde_json::from_str(
+        r#"{
         "cartile": "0.1.0",
         "type": "map",
         "name": "test",
@@ -290,7 +315,9 @@ fn overlapping_gid_ranges() {
             "name": "ground",
             "data": [1]
         }]
-    }"#).unwrap();
+    }"#,
+    )
+    .unwrap();
     let err = map.validate().unwrap_err();
     assert!(
         matches!(err, ValidationError::OverlappingGidRanges { ref a, ref b } if a == "ts_a" && b == "ts_b"),
@@ -304,7 +331,8 @@ fn overlapping_gid_ranges() {
 
 #[test]
 fn oblique_missing_angle() {
-    let map: CartileMap = serde_json::from_str(r#"{
+    let map: CartileMap = serde_json::from_str(
+        r#"{
         "cartile": "0.1.0",
         "type": "map",
         "name": "test",
@@ -321,7 +349,9 @@ fn oblique_missing_angle() {
             "name": "ground",
             "data": [1]
         }]
-    }"#).unwrap();
+    }"#,
+    )
+    .unwrap();
     let err = map.validate().unwrap_err();
     assert_eq!(err, ValidationError::MissingObliqueAngle);
 }
@@ -332,7 +362,8 @@ fn oblique_missing_angle() {
 
 #[test]
 fn duplicate_object_id() {
-    let map: CartileMap = serde_json::from_str(r#"{
+    let map: CartileMap = serde_json::from_str(
+        r#"{
         "cartile": "0.1.0",
         "type": "map",
         "name": "test",
@@ -360,7 +391,9 @@ fn duplicate_object_id() {
                 ]
             }
         ]
-    }"#).unwrap();
+    }"#,
+    )
+    .unwrap();
     let err = map.validate().unwrap_err();
     assert!(
         matches!(err, ValidationError::DuplicateObjectId { id: 1 }),

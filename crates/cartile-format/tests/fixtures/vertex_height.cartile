@@ -1,0 +1,27 @@
+{
+  "cartile": "0.1.0",
+  "type": "map",
+  "name": "height_test",
+  "grid": {
+    "type": "square",
+    "width": 2,
+    "height": 2,
+    "tile_width": 32,
+    "tile_height": 32,
+    "projection": { "type": "oblique", "angle": 26.57 },
+    "height_mode": "vertex"
+  },
+  "tilesets": [],
+  "layers": [
+    {
+      "type": "tile",
+      "name": "ground",
+      "data": [0, 0, 0, 0]
+    },
+    {
+      "type": "heightmap",
+      "name": "terrain_height",
+      "data": [0, 0, 0, 1, 2, 1, 0, 1, 0]
+    }
+  ]
+}

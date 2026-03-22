@@ -1,0 +1,26 @@
+{
+  "cartile": "0.1.0",
+  "type": "map",
+  "name": "with_ref",
+  "grid": {
+    "type": "square",
+    "width": 1,
+    "height": 1,
+    "tile_width": 16,
+    "tile_height": 16,
+    "projection": { "type": "orthogonal" }
+  },
+  "tilesets": [
+    {
+      "$ref": "./terrain.cartile-ts",
+      "first_gid": 1
+    }
+  ],
+  "layers": [
+    {
+      "type": "tile",
+      "name": "ground",
+      "data": [1]
+    }
+  ]
+}
