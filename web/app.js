@@ -677,6 +677,9 @@ function render() {
         }
     }
 
+    // Render object layers
+    renderObjectLayers();
+
     // Draw grid overlay (after tiles, before axis lines)
     if (showGrid) {
         renderGridOverlay();
@@ -719,6 +722,120 @@ function render() {
         ctx.fillStyle = 'rgba(80, 255, 80, 0.7)';
         ctx.fillText('Y', originScreen.x - 12, originScreen.y + 14);
     }
+    ctx.restore();
+}
+
+// ============================================================
+// Object Layer Rendering
+// ============================================================
+
+function renderObjectLayers() {
+    if (!mapData || !mapData.layers) return;
+
+    for (const layer of mapData.layers) {
+        if (layer.type !== 'object') continue;
+        if (!layerVisibility[layer.name]) continue;
+
+        const objects = layer.objects || [];
+
+        for (const obj of objects) {
+            renderObject(obj);
+        }
+    }
+}
+
+function renderObject(obj) {
+    const shape = obj.shape || 'rect';
+    const x = obj.x || 0;
+    const y = obj.y || 0;
+    const w = obj.width || 0;
+    const h = obj.height || 0;
+    const rotation = obj.rotation || 0;
+
+    ctx.save();
+
+    // Apply rotation around (x, y) if needed
+    if (rotation !== 0) {
+        ctx.translate(x, y);
+        ctx.rotate(rotation * Math.PI / 180);
+        ctx.translate(-x, -y);
+    }
+
+    const fillColor = 'rgba(88, 166, 255, 0.15)';
+    const strokeColor = 'rgba(88, 166, 255, 0.7)';
+    const lineWidth = 1.5 / camera.zoom;
+
+    ctx.fillStyle = fillColor;
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = lineWidth;
+
+    switch (shape) {
+        case 'point': {
+            const r = 4 / camera.zoom;
+            ctx.fillStyle = '#58a6ff';
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.fill();
+            // Draw crosshair
+            ctx.strokeStyle = '#58a6ff';
+            ctx.lineWidth = 1 / camera.zoom;
+            const cr = 8 / camera.zoom;
+            ctx.beginPath();
+            ctx.moveTo(x - cr, y); ctx.lineTo(x + cr, y);
+            ctx.moveTo(x, y - cr); ctx.lineTo(x, y + cr);
+            ctx.stroke();
+            break;
+        }
+        case 'rect': {
+            ctx.fillRect(x, y, w, h);
+            ctx.strokeRect(x, y, w, h);
+            break;
+        }
+        case 'ellipse': {
+            ctx.beginPath();
+            ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            break;
+        }
+        case 'polygon': {
+            if (!obj.points || obj.points.length < 3) break;
+            ctx.beginPath();
+            ctx.moveTo(x + obj.points[0].x, y + obj.points[0].y);
+            for (let i = 1; i < obj.points.length; i++) {
+                ctx.lineTo(x + obj.points[i].x, y + obj.points[i].y);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            break;
+        }
+        case 'polyline': {
+            if (!obj.points || obj.points.length < 2) break;
+            ctx.beginPath();
+            ctx.moveTo(x + obj.points[0].x, y + obj.points[0].y);
+            for (let i = 1; i < obj.points.length; i++) {
+                ctx.lineTo(x + obj.points[i].x, y + obj.points[i].y);
+            }
+            ctx.stroke();
+            break;
+        }
+    }
+
+    // Draw object name label
+    if (obj.name) {
+        const fontSize = Math.max(8, 11 / camera.zoom);
+        ctx.font = fontSize + 'px sans-serif';
+        ctx.fillStyle = '#58a6ff';
+        ctx.textBaseline = 'bottom';
+
+        if (shape === 'point') {
+            ctx.fillText(obj.name, x + 10 / camera.zoom, y - 4 / camera.zoom);
+        } else {
+            ctx.fillText(obj.name, x + 2 / camera.zoom, y - 2 / camera.zoom);
+        }
+    }
+
     ctx.restore();
 }
 
