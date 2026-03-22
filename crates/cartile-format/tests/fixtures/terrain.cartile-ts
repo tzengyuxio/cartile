@@ -1,0 +1,12 @@
+{
+  "cartile": "0.1.0",
+  "type": "tileset",
+  "name": "terrain",
+  "tile_width": 16,
+  "tile_height": 16,
+  "image": "terrain.png",
+  "image_width": 64,
+  "image_height": 64,
+  "columns": 4,
+  "tile_count": 16
+}
