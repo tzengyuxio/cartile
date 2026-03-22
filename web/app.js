@@ -28,6 +28,20 @@ let activeTilesetIndex = 0;     // which tileset is shown in panel
 let tilesetCanvas, tilesetCtx;  // tileset panel canvas
 let isDirty = false;            // true if map has been modified
 
+// Active layer (for painting target)
+let selectedLayerIndex = 0;
+
+// Grid overlay
+let showGrid = false;
+
+// Undo/Redo
+let undoStack = [];  // { layerIndex, idx, oldValue }
+let redoStack = [];
+const MAX_UNDO = 100;
+
+// Help overlay
+let helpVisible = false;
+
 // Flip/rotation bitmask constants
 const FLIP_H = 0x80000000;
 const FLIP_V = 0x40000000;
@@ -83,6 +97,19 @@ function setMode(mode) {
         tilesetPanel.classList.add('hidden');
     }
     resizeCanvas();
+}
+
+// ============================================================
+// Help Overlay
+// ============================================================
+function toggleHelp() {
+    helpVisible = !helpVisible;
+    document.getElementById('help-overlay').classList.toggle('hidden', !helpVisible);
+}
+
+function hideHelp() {
+    helpVisible = false;
+    document.getElementById('help-overlay').classList.add('hidden');
 }
 
 // ============================================================
@@ -210,7 +237,7 @@ function paintTileAt(e) {
 
     if (col < 0 || row < 0 || col >= (grid.width || 0) || row >= (grid.height || 0)) return;
 
-    // Find the active tile layer (first visible tile layer)
+    // Find the active tile layer
     const activeLayer = findActiveTileLayer();
     if (!activeLayer) return;
 
@@ -218,6 +245,10 @@ function paintTileAt(e) {
     const idx = row * layerWidth + col;
 
     if (activeLayer.data[idx] === selectedTile.gid) return; // no change
+
+    // Push undo entry before modifying
+    const layerIndex = mapData.layers.indexOf(activeLayer);
+    pushUndo(layerIndex, idx, activeLayer.data[idx]);
 
     activeLayer.data[idx] = selectedTile.gid;
     isDirty = true;
@@ -247,6 +278,10 @@ function eraseTileAt(e) {
 
     if (activeLayer.data[idx] === 0) return;
 
+    // Push undo entry before modifying
+    const layerIndex = mapData.layers.indexOf(activeLayer);
+    pushUndo(layerIndex, idx, activeLayer.data[idx]);
+
     activeLayer.data[idx] = 0;
     isDirty = true;
     document.getElementById('btn-save').disabled = false;
@@ -255,7 +290,17 @@ function eraseTileAt(e) {
 
 function findActiveTileLayer() {
     if (!mapData || !mapData.layers) return null;
-    // Use first visible tile layer
+
+    // Use the selected layer if it's a visible tile layer
+    if (selectedLayerIndex >= 0 && selectedLayerIndex < mapData.layers.length) {
+        const layer = mapData.layers[selectedLayerIndex];
+        const isTile = layer.type === 'tile' || layer.layer_type === 'tile';
+        if (isTile && layerVisibility[layer.name]) {
+            return layer;
+        }
+    }
+
+    // Fallback: first visible tile layer
     for (const layer of mapData.layers) {
         const isTile = layer.type === 'tile' || layer.layer_type === 'tile';
         if (isTile && layerVisibility[layer.name]) {
@@ -263,6 +308,134 @@ function findActiveTileLayer() {
         }
     }
     return null;
+}
+
+// ============================================================
+// Undo / Redo
+// ============================================================
+function pushUndo(layerIndex, idx, oldValue) {
+    undoStack.push({ layerIndex, idx, oldValue });
+    if (undoStack.length > MAX_UNDO) {
+        undoStack.shift();
+    }
+    // Clear redo stack on new action
+    redoStack = [];
+}
+
+function undo() {
+    if (undoStack.length === 0 || !mapData || !mapData.layers) return;
+    const entry = undoStack.pop();
+    const layer = mapData.layers[entry.layerIndex];
+    if (!layer || !layer.data) return;
+
+    // Save current value for redo
+    const currentValue = layer.data[entry.idx];
+    redoStack.push({ layerIndex: entry.layerIndex, idx: entry.idx, oldValue: currentValue });
+
+    // Restore old value
+    layer.data[entry.idx] = entry.oldValue;
+    isDirty = true;
+    document.getElementById('btn-save').disabled = false;
+    render();
+}
+
+function redo() {
+    if (redoStack.length === 0 || !mapData || !mapData.layers) return;
+    const entry = redoStack.pop();
+    const layer = mapData.layers[entry.layerIndex];
+    if (!layer || !layer.data) return;
+
+    // Save current value for undo
+    const currentValue = layer.data[entry.idx];
+    undoStack.push({ layerIndex: entry.layerIndex, idx: entry.idx, oldValue: currentValue });
+
+    // Apply redo value
+    layer.data[entry.idx] = entry.oldValue;
+    isDirty = true;
+    document.getElementById('btn-save').disabled = false;
+    render();
+}
+
+// ============================================================
+// Layer Management
+// ============================================================
+function addLayer() {
+    if (!mapData) return;
+    const name = prompt('Layer name:');
+    if (!name || !name.trim()) return;
+
+    const grid = mapData.grid || {};
+    const size = (grid.width || 0) * (grid.height || 0);
+    const newLayer = {
+        type: 'tile',
+        name: name.trim(),
+        visible: true,
+        opacity: 1.0,
+        elevation: 0,
+        encoding: 'dense',
+        data: new Array(size).fill(0),
+    };
+    mapData.layers.push(newLayer);
+    layerVisibility[newLayer.name] = true;
+    selectedLayerIndex = mapData.layers.length - 1;
+    isDirty = true;
+    document.getElementById('btn-save').disabled = false;
+    updateLayerList();
+    render();
+}
+
+function deleteLayer() {
+    if (!mapData || !mapData.layers) return;
+    if (selectedLayerIndex < 0 || selectedLayerIndex >= mapData.layers.length) return;
+
+    const layer = mapData.layers[selectedLayerIndex];
+    if (!confirm('Delete layer "' + layer.name + '"?')) return;
+
+    mapData.layers.splice(selectedLayerIndex, 1);
+    delete layerVisibility[layer.name];
+
+    // Adjust selected index
+    if (selectedLayerIndex >= mapData.layers.length) {
+        selectedLayerIndex = Math.max(0, mapData.layers.length - 1);
+    }
+
+    isDirty = true;
+    document.getElementById('btn-save').disabled = false;
+    updateLayerList();
+    updateMapInfo();
+    render();
+}
+
+function moveLayerUp() {
+    if (!mapData || !mapData.layers) return;
+    if (selectedLayerIndex <= 0) return;
+
+    const layers = mapData.layers;
+    const temp = layers[selectedLayerIndex - 1];
+    layers[selectedLayerIndex - 1] = layers[selectedLayerIndex];
+    layers[selectedLayerIndex] = temp;
+    selectedLayerIndex--;
+
+    isDirty = true;
+    document.getElementById('btn-save').disabled = false;
+    updateLayerList();
+    render();
+}
+
+function moveLayerDown() {
+    if (!mapData || !mapData.layers) return;
+    if (selectedLayerIndex >= mapData.layers.length - 1) return;
+
+    const layers = mapData.layers;
+    const temp = layers[selectedLayerIndex + 1];
+    layers[selectedLayerIndex + 1] = layers[selectedLayerIndex];
+    layers[selectedLayerIndex] = temp;
+    selectedLayerIndex++;
+
+    isDirty = true;
+    document.getElementById('btn-save').disabled = false;
+    updateLayerList();
+    render();
 }
 
 // ============================================================
@@ -383,13 +556,18 @@ function loadMap(map) {
         }
     }
 
-    // Initialize layer visibility
+    // Initialize layer visibility and select first layer
     layerVisibility = {};
+    selectedLayerIndex = 0;
     if (map.layers) {
         for (const layer of map.layers) {
             layerVisibility[layer.name] = layer.visible !== false;
         }
     }
+
+    // Clear undo/redo stacks on new map load
+    undoStack = [];
+    redoStack = [];
 
     // Hide welcome overlay
     document.getElementById('welcome-overlay').classList.add('hidden');
@@ -496,6 +674,11 @@ function render() {
         }
     }
 
+    // Draw grid overlay (after tiles, before axis lines)
+    if (showGrid) {
+        renderGridOverlay();
+    }
+
     // Draw map boundary
     const totalW = mapWidth * tileWidth;
     const totalH = mapHeight * tileHeight;
@@ -534,6 +717,33 @@ function render() {
         ctx.fillText('Y', originScreen.x - 12, originScreen.y + 14);
     }
     ctx.restore();
+}
+
+// ============================================================
+// Grid Overlay
+// ============================================================
+function renderGridOverlay() {
+    const grid = mapData.grid || {};
+    const tw = grid.tile_width || 16;
+    const th = grid.tile_height || 16;
+    const mw = grid.width || 0;
+    const mh = grid.height || 0;
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+    ctx.lineWidth = 1 / camera.zoom;
+
+    for (let x = 0; x <= mw; x++) {
+        ctx.beginPath();
+        ctx.moveTo(x * tw, 0);
+        ctx.lineTo(x * tw, mh * th);
+        ctx.stroke();
+    }
+    for (let y = 0; y <= mh; y++) {
+        ctx.beginPath();
+        ctx.moveTo(0, y * th);
+        ctx.lineTo(mw * tw, y * th);
+        ctx.stroke();
+    }
 }
 
 function mapToScreen(mapX, mapY) {
@@ -829,9 +1039,14 @@ function updateLayerList() {
 
     if (!mapData || !mapData.layers) return;
 
-    for (const layer of mapData.layers) {
-        const item = document.createElement('label');
-        item.className = 'layer-item' + (layerVisibility[layer.name] ? '' : ' hidden-layer');
+    for (let i = 0; i < mapData.layers.length; i++) {
+        const layer = mapData.layers[i];
+        const layerIndex = i;
+
+        const item = document.createElement('div');
+        item.className = 'layer-item'
+            + (layerVisibility[layer.name] ? '' : ' hidden-layer')
+            + (i === selectedLayerIndex ? ' active-layer' : '');
 
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
@@ -839,13 +1054,20 @@ function updateLayerList() {
 
         const isTileLayer = layer.type === 'tile' || layer.layer_type === 'tile';
 
-        checkbox.addEventListener('change', () => {
+        checkbox.addEventListener('change', (e) => {
+            e.stopPropagation();
             layerVisibility[layer.name] = checkbox.checked;
             item.classList.toggle('hidden-layer', !checkbox.checked);
             render();
         });
 
+        // Prevent checkbox click from triggering layer selection
+        checkbox.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+
         const nameSpan = document.createElement('span');
+        nameSpan.className = 'layer-name';
         nameSpan.textContent = layer.name;
 
         item.appendChild(checkbox);
@@ -857,6 +1079,12 @@ function updateLayerList() {
             typeSpan.textContent = ' (' + (layer.type || layer.layer_type || 'unknown') + ')';
             item.appendChild(typeSpan);
         }
+
+        // Click to select active layer
+        item.addEventListener('click', () => {
+            selectedLayerIndex = layerIndex;
+            updateLayerList();
+        });
 
         container.appendChild(item);
     }
@@ -935,6 +1163,66 @@ function resizeCanvas() {
 }
 
 // ============================================================
+// Keyboard Shortcuts
+// ============================================================
+function handleKeyDown(e) {
+    // Skip if user is typing in an input field
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+        return;
+    }
+
+    // Ctrl/Cmd shortcuts
+    if (e.ctrlKey || e.metaKey) {
+        if (e.key === 'z' && !e.shiftKey) {
+            e.preventDefault();
+            undo();
+            return;
+        }
+        if (e.key === 'y' || (e.key === 'z' && e.shiftKey) || (e.key === 'Z' && e.shiftKey)) {
+            e.preventDefault();
+            redo();
+            return;
+        }
+    }
+
+    // Close help on Escape
+    if (e.key === 'Escape') {
+        if (helpVisible) {
+            hideHelp();
+            return;
+        }
+    }
+
+    // Single-key shortcuts (only when no modifier)
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+    switch (e.key.toLowerCase()) {
+        case 'v':
+            setMode('view');
+            break;
+        case 'b':
+            setMode('paint');
+            break;
+        case 's':
+            e.preventDefault();
+            if (mapData && isDirty) saveMap();
+            break;
+        case 'o':
+            e.preventDefault();
+            document.getElementById('file-input').click();
+            break;
+        case 'g':
+            showGrid = !showGrid;
+            document.getElementById('btn-grid').classList.toggle('active', showGrid);
+            render();
+            break;
+        case '?':
+            toggleHelp();
+            break;
+    }
+}
+
+// ============================================================
 // Event Listeners
 // ============================================================
 function setupEventListeners() {
@@ -990,6 +1278,29 @@ function setupEventListeners() {
     // Save
     document.getElementById('btn-save').addEventListener('click', saveMap);
 
+    // Grid toggle
+    document.getElementById('btn-grid').addEventListener('click', () => {
+        showGrid = !showGrid;
+        document.getElementById('btn-grid').classList.toggle('active', showGrid);
+        render();
+    });
+
+    // Help button
+    document.getElementById('btn-help').addEventListener('click', toggleHelp);
+
+    // Help overlay: click backdrop to close
+    document.getElementById('help-overlay').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('help-overlay')) {
+            hideHelp();
+        }
+    });
+
+    // Layer management buttons
+    document.getElementById('btn-layer-add').addEventListener('click', addLayer);
+    document.getElementById('btn-layer-delete').addEventListener('click', deleteLayer);
+    document.getElementById('btn-layer-up').addEventListener('click', moveLayerUp);
+    document.getElementById('btn-layer-down').addEventListener('click', moveLayerDown);
+
     // Tileset panel click
     tilesetCanvas.addEventListener('click', handleTilesetClick);
 
@@ -1005,6 +1316,9 @@ function setupEventListeners() {
         const body = document.getElementById('tileset-panel-body');
         body.style.display = body.style.display === 'none' ? '' : 'none';
     });
+
+    // Keyboard shortcuts
+    window.addEventListener('keydown', handleKeyDown);
 }
 
 // ============================================================

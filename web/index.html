@@ -13,13 +13,39 @@
             <span class="app-name">cartile editor</span>
             <div class="toolbar-spacer"></div>
             <div id="mode-toggle">
-                <button id="btn-mode-view" class="mode-btn active" title="View mode">👁 View</button>
-                <button id="btn-mode-paint" class="mode-btn" title="Paint mode">🖌 Paint</button>
+                <button id="btn-mode-view" class="mode-btn active" title="View mode (V)">👁 View</button>
+                <button id="btn-mode-paint" class="mode-btn" title="Paint mode (B)">🖌 Paint</button>
             </div>
-            <button id="btn-save" title="Save map" disabled>💾 Save</button>
-            <button id="btn-open" title="Open files">📂 Open Files</button>
+            <button id="btn-grid" class="toolbar-btn" title="Toggle grid (G)">🔲 Grid</button>
+            <button id="btn-save" title="Save map (S)" disabled>💾 Save</button>
+            <button id="btn-open" title="Open files (O)">📂 Open Files</button>
             <input type="file" id="file-input" multiple accept=".cartile,.json,.png,.jpg,.webp" hidden>
+            <button id="btn-help" class="toolbar-btn" title="Help (?)">?</button>
             <span id="zoom-display">100%</span>
+        </div>
+
+        <!-- Help overlay -->
+        <div id="help-overlay" class="hidden">
+            <div id="help-panel">
+                <h3>Controls</h3>
+                <div class="help-section">
+                    <div class="help-row"><span class="help-key">View Mode</span> Drag to pan · Scroll to zoom</div>
+                    <div class="help-row"><span class="help-key">Paint Mode</span> Left click = paint · Right click = erase · Middle click = pan</div>
+                    <div class="help-row"><span class="help-key">Scroll</span> Zoom in any mode</div>
+                </div>
+                <h3>Shortcuts</h3>
+                <div class="help-section">
+                    <div class="help-row"><kbd>V</kbd> View mode</div>
+                    <div class="help-row"><kbd>B</kbd> Paint mode (Brush)</div>
+                    <div class="help-row"><kbd>S</kbd> Save</div>
+                    <div class="help-row"><kbd>O</kbd> Open files</div>
+                    <div class="help-row"><kbd>G</kbd> Toggle grid overlay</div>
+                    <div class="help-row"><kbd>Ctrl+Z</kbd> Undo</div>
+                    <div class="help-row"><kbd>Ctrl+Y</kbd> / <kbd>Ctrl+Shift+Z</kbd> Redo</div>
+                    <div class="help-row"><kbd>?</kbd> Toggle this help</div>
+                </div>
+                <p class="help-dismiss">Click anywhere or press Escape to close</p>
+            </div>
         </div>
 
         <!-- Main area -->
@@ -46,13 +72,22 @@
                     <div id="tileset-panel-body">
                         <canvas id="tileset-canvas"></canvas>
                     </div>
+                    <div id="paint-hint" class="hint">Left: paint · Right: erase</div>
                 </div>
             </div>
 
             <!-- Side panel -->
             <div id="side-panel">
                 <div class="panel-section">
-                    <h3>Layers</h3>
+                    <div class="panel-section-header">
+                        <h3>Layers</h3>
+                        <div class="layer-actions">
+                            <button id="btn-layer-up" class="layer-action-btn" title="Move layer up">▲</button>
+                            <button id="btn-layer-down" class="layer-action-btn" title="Move layer down">▼</button>
+                            <button id="btn-layer-add" class="layer-action-btn" title="Add layer">+</button>
+                            <button id="btn-layer-delete" class="layer-action-btn" title="Delete layer">🗑</button>
+                        </div>
+                    </div>
                     <div id="layer-list"></div>
                 </div>
                 <div class="panel-section">
