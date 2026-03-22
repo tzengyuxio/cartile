@@ -82,6 +82,127 @@ cartile validate mymap.cartile
 cartile validate mymap.cartile --quiet
 ```
 
+### `cartile schema`
+
+Generate the JSON Schema for the cartile map format.
+
+```
+cartile schema [-o <OUTPUT>]
+```
+
+| Flag | Description |
+|------|-------------|
+| `-o, --output` | Output file (default: print to stdout) |
+
+**Example:**
+
+```bash
+cartile schema -o schemas/cartile-map.schema.json
+```
+
+---
+
+## Web Editor
+
+The web editor lets you view and edit tilemap files directly in the browser. No installation required — just a local HTTP server.
+
+### Getting Started
+
+```bash
+# Build the WASM module (one-time)
+wasm-pack build crates/cartile-wasm --target web --out-dir ../../web/pkg
+
+# Start a local server
+python3 -m http.server 8080 -d web
+
+# Open http://localhost:8080
+```
+
+### Loading Files
+
+- **Drag and drop**: Drag `.cartile`, Tiled `.json`, and tileset image files (`.png`) onto the canvas area. Drop map and images together.
+- **Open button** (`O`): Click "Open Files" in the toolbar or press `O` to open a file picker.
+
+The editor auto-detects whether a JSON file is Tiled format (via the `tiledversion` field) and converts it on the fly.
+
+### Modes
+
+| Mode | Toolbar | Shortcut | Description |
+|------|---------|----------|-------------|
+| **View** | 👁 View | `V` | Browse the map. Left-drag to pan, scroll to zoom. |
+| **Paint** | 🖌 Paint | `B` | Edit tiles. See painting controls below. |
+
+### Painting Controls
+
+| Action | Control |
+|--------|---------|
+| Select a tile | Click a tile in the **tileset panel** (bottom of canvas) |
+| Paint tile | **Left-click** or **left-drag** on canvas |
+| Erase tile | **Right-click** or **right-drag** on canvas |
+| Pan (in paint mode) | **Middle-click drag** |
+| Zoom | **Scroll wheel** (works in any mode) |
+
+### Layer Management
+
+The **Layers** panel on the right side shows all layers in the map.
+
+| Action | Control |
+|--------|---------|
+| Toggle visibility | Click the **checkbox** next to a layer name |
+| Set active layer | **Click the layer name** — the active layer (highlighted with blue border) is the target for painting |
+| Add layer | Click **+** — enter a name for the new tile layer |
+| Delete layer | Select a layer, then click **🗑** |
+| Reorder layers | Click **▲** / **▼** to move the selected layer up or down (affects render order) |
+
+### Display Options
+
+| Feature | Control | Shortcut |
+|---------|---------|----------|
+| Grid overlay | Click **Grid** button in toolbar | `G` |
+| Zoom in/out | Scroll wheel, or use toolbar zoom display | — |
+
+Grid overlay draws subtle lines at tile boundaries, helpful when painting.
+
+### Tile Info
+
+- **Status bar** (bottom): Shows cursor position (grid coordinates), tile GID, and active layer name.
+- **Tile Properties** panel (right): When hovering over a tile, shows the tile's GID, tileset name, local index, and any custom properties defined in the tileset.
+
+### Undo / Redo
+
+| Action | Shortcut |
+|--------|----------|
+| Undo | `Ctrl+Z` (or `Cmd+Z` on macOS) |
+| Redo | `Ctrl+Y` or `Ctrl+Shift+Z` |
+
+Undo/redo tracks individual tile changes (paint and erase). History is cleared when loading a new map.
+
+### Saving
+
+- Click **💾 Save** in the toolbar or press `S` to download the current map as a `.cartile` file.
+- The save button is enabled (not grayed out) only when the map has been modified.
+
+### Keyboard Shortcuts Reference
+
+| Key | Action |
+|-----|--------|
+| `V` | Switch to View mode |
+| `B` | Switch to Paint (Brush) mode |
+| `G` | Toggle grid overlay |
+| `S` | Save map |
+| `O` | Open files |
+| `?` | Toggle help overlay |
+| `Ctrl+Z` | Undo |
+| `Ctrl+Y` | Redo |
+
+### Limitations (current version)
+
+- **Orthogonal only**: Isometric and hexagonal rendering not yet supported in the editor.
+- **No object layer editing**: Object layers are listed in the panel but cannot be edited or rendered on canvas.
+- **No auto-tiling in editor**: Auto-tile rules are not applied during painting (use the CLI or library API to resolve auto-tiles).
+- **Single session**: No persistent storage — reload the page and your changes are lost unless saved.
+- **No new map creation**: You must load an existing file (or convert from Tiled/LDtk).
+
 ---
 
 ## Supported Input Formats
