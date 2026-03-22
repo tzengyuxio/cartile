@@ -64,6 +64,7 @@ const ZOOM_STEP = 0.1;
 // Helpers
 // ============================================================
 const MODE = { VIEW: 'view', PAINT: 'paint' };
+const PROJECTION = { ORTHOGONAL: 'orthogonal', ISOMETRIC: 'isometric' };
 
 // ============================================================
 // Coordinate conversion helpers (orthogonal / isometric)
@@ -71,7 +72,22 @@ const MODE = { VIEW: 'view', PAINT: 'paint' };
 
 /** Return the projection type string for the current map grid. */
 function getProjection(grid) {
-    return (grid.projection && grid.projection.type) || 'orthogonal';
+    return (grid.projection && grid.projection.type) || PROJECTION.ORTHOGONAL;
+}
+
+/**
+ * Return the pixel dimensions of the full map area.
+ * For isometric maps this is the bounding box of the diamond layout.
+ */
+function getMapPixelBounds(grid) {
+    const tw = grid.tile_width || 16;
+    const th = grid.tile_height || 16;
+    const mw = grid.width || 0;
+    const mh = grid.height || 0;
+    if (getProjection(grid) === PROJECTION.ISOMETRIC) {
+        return { width: (mw + mh) * tw / 2, height: (mw + mh) * th / 2 };
+    }
+    return { width: mw * tw, height: mh * th };
 }
 
 /**
@@ -82,7 +98,7 @@ function tileToScreen(col, row, grid) {
     const tw = grid.tile_width || 16;
     const th = grid.tile_height || 16;
 
-    if (getProjection(grid) === 'isometric') {
+    if (getProjection(grid) === PROJECTION.ISOMETRIC) {
         const mapWidth = grid.width || 0;
         const offsetX = mapWidth * tw / 2; // center the diamond
         return {
@@ -106,7 +122,7 @@ function screenToTile(mapX, mapY, grid) {
     const tw = grid.tile_width || 16;
     const th = grid.tile_height || 16;
 
-    if (getProjection(grid) === 'isometric') {
+    if (getProjection(grid) === PROJECTION.ISOMETRIC) {
         const mapWidth = grid.width || 0;
         const offsetX = mapWidth * tw / 2;
         const isoX = mapX - offsetX;
@@ -776,19 +792,7 @@ function loadMap(map) {
 
     // Center the map in the canvas
     const grid = map.grid || {};
-    const projection = getProjection(grid);
-    const tw = grid.tile_width || 16;
-    const th = grid.tile_height || 16;
-    const mapW = grid.width || 0;
-    const mapH = grid.height || 0;
-    let mapPixelW, mapPixelH;
-    if (projection === 'isometric') {
-        mapPixelW = (mapW + mapH) * tw / 2;
-        mapPixelH = (mapW + mapH) * th / 2;
-    } else {
-        mapPixelW = mapW * tw;
-        mapPixelH = mapH * th;
-    }
+    const { width: mapPixelW, height: mapPixelH } = getMapPixelBounds(grid);
     const container = document.getElementById('canvas-container');
     camera.zoom = 1.0;
     camera.x = -(container.clientWidth / camera.zoom - mapPixelW) / 2;
@@ -833,6 +837,14 @@ function render() {
     const mapWidth = grid.width || 0;
     const mapHeight = grid.height || 0;
 
+    // Cache projection and isometric offset once for the whole frame
+    const projection = getProjection(grid);
+    const isIso = projection === PROJECTION.ISOMETRIC;
+    const isoOffsetX = isIso ? mapWidth * tileWidth / 2 : 0;
+
+    // Compute map pixel bounds (used for boundary rect and axis lines)
+    const { width: totalW, height: totalH } = getMapPixelBounds(grid);
+
     // Render each visible tile layer in order
     if (!mapData.layers) return;
 
@@ -858,7 +870,13 @@ function render() {
                 const tsr = findTilesetForGid(tileInfo.gid);
                 if (!tsr) continue;
 
-                const { x: destX, y: destY } = tileToScreen(col, row, grid);
+                // Inline coord math instead of calling tileToScreen every iteration
+                const destX = isIso
+                    ? (col - row) * (tileWidth / 2) + isoOffsetX
+                    : col * tileWidth;
+                const destY = isIso
+                    ? (col + row) * (tileHeight / 2)
+                    : row * tileHeight;
 
                 const tw = tsr.tileset.tile_width || tileWidth;
                 const th = tsr.tileset.tile_height || tileHeight;
@@ -890,11 +908,10 @@ function render() {
     }
 
     // Draw map boundary
-    const projection = getProjection(grid);
     ctx.strokeStyle = 'rgba(88, 166, 255, 0.4)';
     ctx.lineWidth = 1 / camera.zoom;
 
-    if (projection === 'isometric') {
+    if (isIso) {
         // Diamond boundary for isometric maps
         const top = tileToScreen(0, 0, grid);
         const right = tileToScreen(mapWidth, 0, grid);
@@ -908,18 +925,10 @@ function render() {
         ctx.closePath();
         ctx.stroke();
     } else {
-        const totalW = mapWidth * tileWidth;
-        const totalH = mapHeight * tileHeight;
         ctx.strokeRect(0, 0, totalW, totalH);
     }
 
     // Draw origin axis lines (extend beyond map)
-    const totalW = projection === 'isometric'
-        ? (mapWidth + mapHeight) * tileWidth / 2
-        : mapWidth * tileWidth;
-    const totalH = projection === 'isometric'
-        ? (mapWidth + mapHeight) * tileHeight / 2
-        : mapHeight * tileHeight;
     const axisExtent = 2000 / camera.zoom;
     ctx.lineWidth = 1 / camera.zoom;
 
@@ -1075,12 +1084,12 @@ function renderGridOverlay() {
     const th = grid.tile_height || 16;
     const mw = grid.width || 0;
     const mh = grid.height || 0;
-    const projection = getProjection(grid);
+    const isIso = getProjection(grid) === PROJECTION.ISOMETRIC;
 
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
     ctx.lineWidth = 1 / camera.zoom;
 
-    if (projection === 'isometric') {
+    if (isIso) {
         // Draw diamond grid lines
         ctx.beginPath();
         for (let col = 0; col <= mw; col++) {
