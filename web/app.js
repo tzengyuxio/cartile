@@ -225,6 +225,34 @@ function paintTileAt(e) {
     render();
 }
 
+function eraseTileAt(e) {
+    const rect = canvas.getBoundingClientRect();
+    const screenX = e.clientX - rect.left;
+    const screenY = e.clientY - rect.top;
+    const { mapX, mapY } = screenToMap(screenX, screenY);
+
+    const grid = mapData.grid || {};
+    const tileWidth = grid.tile_width || 16;
+    const tileHeight = grid.tile_height || 16;
+    const col = Math.floor(mapX / tileWidth);
+    const row = Math.floor(mapY / tileHeight);
+
+    if (col < 0 || row < 0 || col >= (grid.width || 0) || row >= (grid.height || 0)) return;
+
+    const activeLayer = findActiveTileLayer();
+    if (!activeLayer) return;
+
+    const layerWidth = activeLayer.width || grid.width || 0;
+    const idx = row * layerWidth + col;
+
+    if (activeLayer.data[idx] === 0) return;
+
+    activeLayer.data[idx] = 0;
+    isDirty = true;
+    document.getElementById('btn-save').disabled = false;
+    render();
+}
+
 function findActiveTileLayer() {
     if (!mapData || !mapData.layers) return null;
     // Use first visible tile layer
@@ -611,10 +639,16 @@ function findTilesetForGid(gid) {
 // Camera (Pan / Zoom)
 // ============================================================
 function handleMouseDown(e) {
-    // Paint mode: left click paints a tile
-    if (currentMode === 'paint' && e.button === 0 && selectedTile && mapData) {
-        paintTileAt(e);
-        return;
+    // Paint mode: left click paints, right click erases
+    if (currentMode === 'paint' && mapData) {
+        if (e.button === 0 && selectedTile) {
+            paintTileAt(e);
+            return;
+        }
+        if (e.button === 2) {
+            eraseTileAt(e);
+            return;
+        }
     }
 
     // Pan with left click in view mode, or middle mouse in any mode
@@ -627,9 +661,13 @@ function handleMouseDown(e) {
 }
 
 function handleMouseMove(e) {
-    // Paint on drag in paint mode
-    if (currentMode === 'paint' && e.buttons === 1 && selectedTile && mapData && !isPanning) {
-        paintTileAt(e);
+    // Paint on drag (left button) or erase on drag (right button)
+    if (currentMode === 'paint' && mapData && !isPanning) {
+        if (e.buttons === 1 && selectedTile) {
+            paintTileAt(e);
+        } else if (e.buttons === 2) {
+            eraseTileAt(e);
+        }
     }
 
     if (isPanning) {
@@ -938,6 +976,9 @@ function setupEventListeners() {
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
     canvas.addEventListener('wheel', handleWheel, { passive: false });
+    canvas.addEventListener('contextmenu', (e) => {
+        if (currentMode === 'paint') e.preventDefault();
+    });
 
     // Resize
     window.addEventListener('resize', resizeCanvas);
