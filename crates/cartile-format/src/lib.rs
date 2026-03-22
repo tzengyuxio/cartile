@@ -1,6 +1,7 @@
 pub mod error;
 pub mod tile_id;
 pub mod types;
+mod validate;
 
 pub use error::{CartileError, ValidationError};
 pub use tile_id::TileId;
