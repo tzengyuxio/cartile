@@ -61,6 +61,48 @@ const ZOOM_MAX = 4.0;
 const ZOOM_STEP = 0.1;
 
 // ============================================================
+// Helpers
+// ============================================================
+const MODE = { VIEW: 'view', PAINT: 'paint' };
+
+function isTileLayer(layer) {
+    return layer.type === 'tile' || layer.layer_type === 'tile';
+}
+
+function getLayerData(layer) {
+    return layer.data || layer.tiles;
+}
+
+function getFirstGid(ts) {
+    return ts.first_gid || ts.firstgid || 1;
+}
+
+function tilesetBasename(imagePath) {
+    return (imagePath || '').split('/').pop().toLowerCase();
+}
+
+function markDirty() {
+    markDirty();
+}
+
+function eventToTileCoords(e) {
+    const rect = canvas.getBoundingClientRect();
+    const screenX = e.clientX - rect.left;
+    const screenY = e.clientY - rect.top;
+    const { mapX, mapY } = screenToMap(screenX, screenY);
+    const grid = mapData.grid || {};
+    const tileWidth = grid.tile_width || 16;
+    const tileHeight = grid.tile_height || 16;
+    const col = Math.floor(mapX / tileWidth);
+    const row = Math.floor(mapY / tileHeight);
+    if (col < 0 || row < 0 || col >= (grid.width || 0) || row >= (grid.height || 0)) return null;
+    return { col, row };
+}
+
+// Cached status bar DOM elements (set in main)
+let statusCursor, statusGid, statusLayer;
+
+// ============================================================
 // Initialization
 // ============================================================
 async function main() {
@@ -69,6 +111,10 @@ async function main() {
 
     tilesetCanvas = document.getElementById('tileset-canvas');
     tilesetCtx = tilesetCanvas.getContext('2d');
+
+    statusCursor = document.getElementById('status-cursor');
+    statusGid = document.getElementById('status-gid');
+    statusLayer = document.getElementById('status-layer');
 
     resizeCanvas();
     setupEventListeners();
@@ -91,13 +137,13 @@ async function main() {
 // ============================================================
 function setMode(mode) {
     currentMode = mode;
-    document.getElementById('btn-mode-view').classList.toggle('active', mode === 'view');
-    document.getElementById('btn-mode-paint').classList.toggle('active', mode === 'paint');
-    canvas.classList.toggle('paint-mode', mode === 'paint');
+    document.getElementById('btn-mode-view').classList.toggle('active', mode === MODE.VIEW);
+    document.getElementById('btn-mode-paint').classList.toggle('active', mode === MODE.PAINT);
+    canvas.classList.toggle('paint-mode', mode === MODE.PAINT);
 
     // Show/hide tileset panel
     const tilesetPanel = document.getElementById('tileset-panel');
-    if (mode === 'paint' && mapData) {
+    if (mode === MODE.PAINT && mapData) {
         tilesetPanel.classList.remove('hidden');
         renderTilesetPanel();
     } else {
@@ -145,8 +191,7 @@ function renderTilesetCanvas() {
     if (!ts) return;
 
     const imagePath = ts.image || '';
-    const basename = imagePath.split('/').pop().toLowerCase();
-    const img = tilesetImages[basename];
+    const img = tilesetImages[tilesetBasename(imagePath)];
 
     if (!img) {
         // Show "no image" message
@@ -217,9 +262,8 @@ function handleTilesetClick(e) {
 
     if (localIndex < 0 || localIndex >= (ts.tile_count || 0)) return;
 
-    const firstGid = ts.first_gid || ts.firstgid || 1;
     selectedTile = {
-        gid: firstGid + localIndex,
+        gid: getFirstGid(ts) + localIndex,
         tilesetIndex: activeTilesetIndex,
         localIndex: localIndex,
     };
@@ -245,7 +289,7 @@ function buildAutoTileIndex() {
         const ts = mapData.tilesets[tsIdx];
         if (!ts.tiles) continue;
 
-        const firstGid = ts.first_gid || ts.firstgid || 1;
+        const firstGid = getFirstGid(ts);
 
         for (const [localIdStr, tileData] of Object.entries(ts.tiles)) {
             if (!tileData.auto_tile) continue;
@@ -358,7 +402,7 @@ function updateAutoTilesAround(layer, col, row, grid) {
 
             const idx = r * w + c;
             const oldRaw = layer.data[idx];
-            const flags = (oldRaw >>> 0) & 0xE0000000;  // preserve flip flags
+            const flags = (oldRaw >>> 0) & (FLIP_H | FLIP_V | FLIP_D);  // preserve flip flags
             const newGid = groupData.firstGid + newLocalId;
             layer.data[idx] = (flags | newGid) >>> 0;
         }
@@ -369,75 +413,36 @@ function updateAutoTilesAround(layer, col, row, grid) {
 // Tile Painting
 // ============================================================
 function paintTileAt(e) {
-    const rect = canvas.getBoundingClientRect();
-    const screenX = e.clientX - rect.left;
-    const screenY = e.clientY - rect.top;
-    const { mapX, mapY } = screenToMap(screenX, screenY);
-
-    const grid = mapData.grid || {};
-    const tileWidth = grid.tile_width || 16;
-    const tileHeight = grid.tile_height || 16;
-    const col = Math.floor(mapX / tileWidth);
-    const row = Math.floor(mapY / tileHeight);
-
-    if (col < 0 || row < 0 || col >= (grid.width || 0) || row >= (grid.height || 0)) return;
-
-    // Find the active tile layer
+    const coords = eventToTileCoords(e);
+    if (!coords) return;
     const activeLayer = findActiveTileLayer();
     if (!activeLayer) return;
-
+    const grid = mapData.grid || {};
     const layerWidth = activeLayer.width || grid.width || 0;
-    const idx = row * layerWidth + col;
-
-    if (activeLayer.data[idx] === selectedTile.gid) return; // no change
-
-    // Push undo entry before modifying
+    const idx = coords.row * layerWidth + coords.col;
+    if (activeLayer.data[idx] === selectedTile.gid) return;
     const layerIndex = mapData.layers.indexOf(activeLayer);
     pushUndo(layerIndex, idx, activeLayer.data[idx]);
-
     activeLayer.data[idx] = selectedTile.gid;
-
-    // Live auto-tiling: update painted tile + neighbors
-    updateAutoTilesAround(activeLayer, col, row, grid);
-
-    isDirty = true;
-    document.getElementById('btn-save').disabled = false;
+    updateAutoTilesAround(activeLayer, coords.col, coords.row, grid);
+    markDirty();
     render();
 }
 
 function eraseTileAt(e) {
-    const rect = canvas.getBoundingClientRect();
-    const screenX = e.clientX - rect.left;
-    const screenY = e.clientY - rect.top;
-    const { mapX, mapY } = screenToMap(screenX, screenY);
-
-    const grid = mapData.grid || {};
-    const tileWidth = grid.tile_width || 16;
-    const tileHeight = grid.tile_height || 16;
-    const col = Math.floor(mapX / tileWidth);
-    const row = Math.floor(mapY / tileHeight);
-
-    if (col < 0 || row < 0 || col >= (grid.width || 0) || row >= (grid.height || 0)) return;
-
+    const coords = eventToTileCoords(e);
+    if (!coords) return;
     const activeLayer = findActiveTileLayer();
     if (!activeLayer) return;
-
+    const grid = mapData.grid || {};
     const layerWidth = activeLayer.width || grid.width || 0;
-    const idx = row * layerWidth + col;
-
+    const idx = coords.row * layerWidth + coords.col;
     if (activeLayer.data[idx] === 0) return;
-
-    // Push undo entry before modifying
     const layerIndex = mapData.layers.indexOf(activeLayer);
     pushUndo(layerIndex, idx, activeLayer.data[idx]);
-
     activeLayer.data[idx] = 0;
-
-    // Live auto-tiling: update neighbors after erasing
-    updateAutoTilesAround(activeLayer, col, row, grid);
-
-    isDirty = true;
-    document.getElementById('btn-save').disabled = false;
+    updateAutoTilesAround(activeLayer, coords.col, coords.row, grid);
+    markDirty();
     render();
 }
 
@@ -447,16 +452,14 @@ function findActiveTileLayer() {
     // Use the selected layer if it's a visible tile layer
     if (selectedLayerIndex >= 0 && selectedLayerIndex < mapData.layers.length) {
         const layer = mapData.layers[selectedLayerIndex];
-        const isTile = layer.type === 'tile' || layer.layer_type === 'tile';
-        if (isTile && layerVisibility[layer.name]) {
+        if (isTileLayer(layer) && layerVisibility[layer.name]) {
             return layer;
         }
     }
 
     // Fallback: first visible tile layer
     for (const layer of mapData.layers) {
-        const isTile = layer.type === 'tile' || layer.layer_type === 'tile';
-        if (isTile && layerVisibility[layer.name]) {
+        if (isTileLayer(layer) && layerVisibility[layer.name]) {
             return layer;
         }
     }
@@ -472,7 +475,7 @@ function pushUndo(layerIndex, idx, oldValue) {
         undoStack.shift();
     }
     // Clear redo stack on new action
-    redoStack = [];
+    redoStack.length = 0;
 }
 
 function undo() {
@@ -487,8 +490,7 @@ function undo() {
 
     // Restore old value
     layer.data[entry.idx] = entry.oldValue;
-    isDirty = true;
-    document.getElementById('btn-save').disabled = false;
+    markDirty();
     render();
 }
 
@@ -504,8 +506,7 @@ function redo() {
 
     // Apply redo value
     layer.data[entry.idx] = entry.oldValue;
-    isDirty = true;
-    document.getElementById('btn-save').disabled = false;
+    markDirty();
     render();
 }
 
@@ -531,8 +532,7 @@ function addLayer() {
     mapData.layers.push(newLayer);
     layerVisibility[newLayer.name] = true;
     selectedLayerIndex = mapData.layers.length - 1;
-    isDirty = true;
-    document.getElementById('btn-save').disabled = false;
+    markDirty();
     updateLayerList();
     render();
 }
@@ -552,8 +552,7 @@ function deleteLayer() {
         selectedLayerIndex = Math.max(0, mapData.layers.length - 1);
     }
 
-    isDirty = true;
-    document.getElementById('btn-save').disabled = false;
+    markDirty();
     updateLayerList();
     updateMapInfo();
     render();
@@ -569,8 +568,7 @@ function moveLayerUp() {
     layers[selectedLayerIndex] = temp;
     selectedLayerIndex--;
 
-    isDirty = true;
-    document.getElementById('btn-save').disabled = false;
+    markDirty();
     updateLayerList();
     render();
 }
@@ -585,8 +583,7 @@ function moveLayerDown() {
     layers[selectedLayerIndex] = temp;
     selectedLayerIndex++;
 
-    isDirty = true;
-    document.getElementById('btn-save').disabled = false;
+    markDirty();
     updateLayerList();
     render();
 }
@@ -683,6 +680,7 @@ function loadImageFile(file) {
         const url = URL.createObjectURL(file);
         const img = new Image();
         img.onload = () => {
+            URL.revokeObjectURL(url);
             // Store by basename (lowercase)
             const basename = file.name.split('/').pop().toLowerCase();
             tilesetImages[basename] = img;
@@ -698,16 +696,6 @@ function loadMap(map) {
     hoveredTile = null;
     isDirty = false;
     document.getElementById('btn-save').disabled = true;
-
-    console.log('Map loaded:', map.name, 'grid:', map.grid);
-    console.log('Loaded tileset images:', Object.keys(tilesetImages));
-    if (map.tilesets) {
-        for (const ts of map.tilesets) {
-            const img = ts.image || '';
-            const basename = img.split('/').pop().toLowerCase();
-            console.log('Tileset', ts.name, 'needs image:', basename, 'found:', !!tilesetImages[basename]);
-        }
-    }
 
     // Initialize layer visibility and select first layer
     layerVisibility = {};
@@ -748,7 +736,7 @@ function loadMap(map) {
     selectedTile = null;
 
     // If already in paint mode, show tileset panel
-    if (currentMode === 'paint') {
+    if (currentMode === MODE.PAINT) {
         document.getElementById('tileset-panel').classList.remove('hidden');
         renderTilesetPanel();
     }
@@ -785,10 +773,10 @@ function render() {
     if (!mapData.layers) return;
 
     for (const layer of mapData.layers) {
-        if (layer.type !== 'tile' && layer.layer_type !== 'tile') continue;
+        if (!isTileLayer(layer)) continue;
         if (!layerVisibility[layer.name]) continue;
 
-        const data = layer.data || layer.tiles;
+        const data = getLayerData(layer);
         if (!data) continue;
 
         const layerWidth = layer.width || mapWidth;
@@ -1005,18 +993,16 @@ function renderGridOverlay() {
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
     ctx.lineWidth = 1 / camera.zoom;
 
+    ctx.beginPath();
     for (let x = 0; x <= mw; x++) {
-        ctx.beginPath();
         ctx.moveTo(x * tw, 0);
         ctx.lineTo(x * tw, mh * th);
-        ctx.stroke();
     }
     for (let y = 0; y <= mh; y++) {
-        ctx.beginPath();
         ctx.moveTo(0, y * th);
         ctx.lineTo(mw * tw, y * th);
-        ctx.stroke();
     }
+    ctx.stroke();
 }
 
 function mapToScreen(mapX, mapY) {
@@ -1067,6 +1053,7 @@ function renderTile(ctx, tileInfo, dx, dy, tw, th, img, sx, sy) {
 }
 
 function renderPlaceholder(ctx, dx, dy, tw, th) {
+    ctx.save();
     ctx.fillStyle = '#3d1f5c';
     ctx.fillRect(dx, dy, tw, th);
     ctx.fillStyle = '#c9a0ff';
@@ -1074,6 +1061,7 @@ function renderPlaceholder(ctx, dx, dy, tw, th) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('?', dx + tw / 2, dy + th / 2);
+    ctx.restore();
 }
 
 function extractTileInfo(raw) {
@@ -1093,9 +1081,9 @@ function findTilesetForGid(gid) {
     // Find the tileset with the highest first_gid <= gid
     let match = null;
     for (const ts of mapData.tilesets) {
-        const firstGid = ts.first_gid || ts.firstgid || 1;
+        const firstGid = getFirstGid(ts);
         if (gid >= firstGid) {
-            if (!match || firstGid > (match.first_gid || match.firstgid || 1)) {
+            if (!match || firstGid > getFirstGid(match)) {
                 match = ts;
             }
         }
@@ -1103,13 +1091,12 @@ function findTilesetForGid(gid) {
 
     if (!match) return null;
 
-    const firstGid = match.first_gid || match.firstgid || 1;
+    const firstGid = getFirstGid(match);
     const localIndex = gid - firstGid;
 
     // Find image by basename
     const imagePath = match.image || '';
-    const basename = imagePath.split('/').pop().toLowerCase();
-    const image = tilesetImages[basename] || null;
+    const image = tilesetImages[tilesetBasename(imagePath)] || null;
 
     return {
         tileset: match,
@@ -1123,7 +1110,7 @@ function findTilesetForGid(gid) {
 // ============================================================
 function handleMouseDown(e) {
     // Paint mode: left click paints, right click erases
-    if (currentMode === 'paint' && mapData) {
+    if (currentMode === MODE.PAINT && mapData) {
         if (e.button === 0 && selectedTile) {
             paintTileAt(e);
             return;
@@ -1135,7 +1122,7 @@ function handleMouseDown(e) {
     }
 
     // Pan with left click in view mode, or middle mouse in any mode
-    if ((e.button === 0 && currentMode === 'view') || e.button === 1) {
+    if ((e.button === 0 && currentMode === MODE.VIEW) || e.button === 1) {
         isPanning = true;
         panStart.x = e.clientX;
         panStart.y = e.clientY;
@@ -1145,7 +1132,7 @@ function handleMouseDown(e) {
 
 function handleMouseMove(e) {
     // Paint on drag (left button) or erase on drag (right button)
-    if (currentMode === 'paint' && mapData && !isPanning) {
+    if (currentMode === MODE.PAINT && mapData && !isPanning) {
         if (e.buttons === 1 && selectedTile) {
             paintTileAt(e);
         } else if (e.buttons === 2) {
@@ -1174,7 +1161,7 @@ function handleMouseMove(e) {
 
 function handleMouseUp() {
     isPanning = false;
-    if (currentMode === 'paint') {
+    if (currentMode === MODE.PAINT) {
         canvas.style.cursor = 'crosshair';
     } else {
         canvas.style.cursor = 'default';
@@ -1229,14 +1216,17 @@ function updateHoveredTile(screenX, screenY) {
     const row = Math.floor(mapY / tileHeight);
 
     if (col < 0 || row < 0 || col >= mapWidth || row >= mapHeight) {
-        document.getElementById('status-cursor').textContent = '–';
-        document.getElementById('status-gid').textContent = '–';
-        document.getElementById('status-layer').textContent = '–';
+        hoveredTile = null;
+        statusCursor.textContent = '–';
+        statusGid.textContent = '–';
+        statusLayer.textContent = '–';
         updateTileProperties(null);
         return;
     }
 
-    document.getElementById('status-cursor').textContent = 'Cursor: (' + col + ', ' + row + ')';
+    if (hoveredTile && hoveredTile.col === col && hoveredTile.row === row) return;
+
+    statusCursor.textContent = 'Cursor: (' + col + ', ' + row + ')';
 
     // Find topmost visible tile at position
     let foundGid = 0;
@@ -1245,10 +1235,10 @@ function updateHoveredTile(screenX, screenY) {
     if (mapData.layers) {
         for (let i = mapData.layers.length - 1; i >= 0; i--) {
             const layer = mapData.layers[i];
-            if (layer.type !== 'tile' && layer.layer_type !== 'tile') continue;
+            if (!isTileLayer(layer)) continue;
             if (!layerVisibility[layer.name]) continue;
 
-            const data = layer.data || layer.tiles;
+            const data = getLayerData(layer);
             if (!data) continue;
 
             const layerWidth = layer.width || mapWidth;
@@ -1266,8 +1256,8 @@ function updateHoveredTile(screenX, screenY) {
         }
     }
 
-    document.getElementById('status-gid').textContent = foundGid ? 'GID: ' + foundGid : '–';
-    document.getElementById('status-layer').textContent = foundLayerName !== '–' ? 'Layer: ' + foundLayerName : '–';
+    statusGid.textContent = foundGid ? 'GID: ' + foundGid : '–';
+    statusLayer.textContent = foundLayerName !== '–' ? 'Layer: ' + foundLayerName : '–';
 
     // Look up tile properties
     if (foundGid) {
@@ -1325,7 +1315,7 @@ function updateLayerList() {
         checkbox.type = 'checkbox';
         checkbox.checked = layerVisibility[layer.name] !== false;
 
-        const isTileLayer = layer.type === 'tile' || layer.layer_type === 'tile';
+        const isTile = isTileLayer(layer);
 
         checkbox.addEventListener('change', (e) => {
             e.stopPropagation();
@@ -1346,7 +1336,7 @@ function updateLayerList() {
         item.appendChild(checkbox);
         item.appendChild(nameSpan);
 
-        if (!isTileLayer) {
+        if (!isTile) {
             const typeSpan = document.createElement('span');
             typeSpan.className = 'layer-type';
             typeSpan.textContent = ' (' + (layer.type || layer.layer_type || 'unknown') + ')';
@@ -1532,6 +1522,7 @@ function handleNewTilesetFile(file) {
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
+        URL.revokeObjectURL(url);
         tilesetImages[file.name.toLowerCase()] = img;
         document.getElementById('new-tileset-label').textContent = '\u2713 ' + file.name + ' (' + img.width + '\u00d7' + img.height + ')';
         document.getElementById('new-tileset-drop').classList.add('has-file');
@@ -1589,10 +1580,10 @@ function handleKeyDown(e) {
             showNewMapModal();
             break;
         case 'v':
-            setMode('view');
+            setMode(MODE.VIEW);
             break;
         case 'b':
-            setMode('paint');
+            setMode(MODE.PAINT);
             break;
         case 's':
             e.preventDefault();
@@ -1656,15 +1647,15 @@ function setupEventListeners() {
     window.addEventListener('mouseup', handleMouseUp);
     canvas.addEventListener('wheel', handleWheel, { passive: false });
     canvas.addEventListener('contextmenu', (e) => {
-        if (currentMode === 'paint') e.preventDefault();
+        if (currentMode === MODE.PAINT) e.preventDefault();
     });
 
     // Resize
     window.addEventListener('resize', resizeCanvas);
 
     // Mode toggle
-    document.getElementById('btn-mode-view').addEventListener('click', () => setMode('view'));
-    document.getElementById('btn-mode-paint').addEventListener('click', () => setMode('paint'));
+    document.getElementById('btn-mode-view').addEventListener('click', () => setMode(MODE.VIEW));
+    document.getElementById('btn-mode-paint').addEventListener('click', () => setMode(MODE.PAINT));
 
     // Save
     document.getElementById('btn-save').addEventListener('click', saveMap);
