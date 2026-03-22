@@ -117,8 +117,7 @@ async function loadMapFile(file) {
         // Show conversion warnings if any
         if (result.warnings && result.warnings.length > 0) {
             const warnEl = document.getElementById('status-warnings');
-            warnEl.textContent = '⚠ ' + result.warnings.length + ' warning(s)';
-            warnEl.title = result.warnings.join('\n');
+            warnEl.textContent = '⚠ ' + result.warnings.join(' | ');
         }
 
         return JSON.parse(result.cartile_json);
