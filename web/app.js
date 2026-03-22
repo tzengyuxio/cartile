@@ -371,10 +371,14 @@ function loadMap(map) {
     updateMapInfo();
     updateTileProperties(null);
 
-    // Reset camera to center the map
-    camera.x = 0;
-    camera.y = 0;
+    // Center the map in the canvas
+    const grid = map.grid || {};
+    const mapPixelW = (grid.width || 0) * (grid.tile_width || 16);
+    const mapPixelH = (grid.height || 0) * (grid.tile_height || 16);
+    const container = document.getElementById('canvas-container');
     camera.zoom = 1.0;
+    camera.x = -(container.clientWidth / camera.zoom - mapPixelW) / 2;
+    camera.y = -(container.clientHeight / camera.zoom - mapPixelH) / 2;
     updateZoomDisplay();
 
     // Reset paint state
@@ -463,6 +467,52 @@ function render() {
             }
         }
     }
+
+    // Draw map boundary
+    const totalW = mapWidth * tileWidth;
+    const totalH = mapHeight * tileHeight;
+    ctx.strokeStyle = 'rgba(88, 166, 255, 0.4)';
+    ctx.lineWidth = 1 / camera.zoom;
+    ctx.strokeRect(0, 0, totalW, totalH);
+
+    // Draw origin axis lines (extend beyond map)
+    const axisExtent = 2000 / camera.zoom;
+    ctx.lineWidth = 1 / camera.zoom;
+
+    // X-axis (horizontal line at y=0)
+    ctx.strokeStyle = 'rgba(255, 80, 80, 0.5)';
+    ctx.beginPath();
+    ctx.moveTo(-axisExtent, 0);
+    ctx.lineTo(totalW + axisExtent, 0);
+    ctx.stroke();
+
+    // Y-axis (vertical line at x=0)
+    ctx.strokeStyle = 'rgba(80, 255, 80, 0.5)';
+    ctx.beginPath();
+    ctx.moveTo(0, -axisExtent);
+    ctx.lineTo(0, totalH + axisExtent);
+    ctx.stroke();
+
+    // Axis labels (drawn in screen space)
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const originScreen = mapToScreen(0, 0);
+    ctx.font = '10px sans-serif';
+    if (originScreen.x > 10 && originScreen.x < w - 10 &&
+        originScreen.y > 10 && originScreen.y < h - 10) {
+        ctx.fillStyle = 'rgba(255, 80, 80, 0.7)';
+        ctx.fillText('X', originScreen.x + 12, originScreen.y - 4);
+        ctx.fillStyle = 'rgba(80, 255, 80, 0.7)';
+        ctx.fillText('Y', originScreen.x - 12, originScreen.y + 14);
+    }
+    ctx.restore();
+}
+
+function mapToScreen(mapX, mapY) {
+    return {
+        x: (mapX - camera.x) * camera.zoom,
+        y: (mapY - camera.y) * camera.zoom,
+    };
 }
 
 function renderTile(ctx, tileInfo, dx, dy, tw, th, img, sx, sy) {
