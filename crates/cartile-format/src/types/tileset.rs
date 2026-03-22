@@ -1,3 +1,4 @@
+use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -34,14 +35,33 @@ impl<'de> Deserialize<'de> for TilesetEntry {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+impl JsonSchema for TilesetEntry {
+    fn schema_name() -> String {
+        "TilesetEntry".to_owned()
+    }
+
+    fn json_schema(generator: &mut schemars::r#gen::SchemaGenerator) -> schemars::schema::Schema {
+        use schemars::schema::{Schema, SchemaObject, SubschemaValidation};
+        let ref_schema = generator.subschema_for::<TilesetRef>();
+        let inline_schema = generator.subschema_for::<Tileset>();
+        Schema::Object(SchemaObject {
+            subschemas: Some(Box::new(SubschemaValidation {
+                any_of: Some(vec![ref_schema, inline_schema]),
+                ..Default::default()
+            })),
+            ..Default::default()
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, JsonSchema, Serialize, Deserialize)]
 pub struct TilesetRef {
     #[serde(rename = "$ref")]
     pub ref_path: String,
     pub first_gid: u32,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, JsonSchema, Serialize, Deserialize)]
 pub struct Tileset {
     pub name: String,
     pub tile_width: u32,
@@ -74,7 +94,7 @@ fn is_zero(v: &u32) -> bool {
     *v == 0
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, JsonSchema, Serialize, Deserialize)]
 pub struct TileData {
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub properties: Properties,
@@ -86,14 +106,14 @@ pub struct TileData {
     pub extra: HashMap<String, serde_json::Value>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, JsonSchema, Serialize, Deserialize)]
 pub struct AutoTile {
     pub group: String,
     pub rule: AutoTileRule,
     pub bitmask: u8,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, JsonSchema, Serialize, Deserialize)]
 pub enum AutoTileRule {
     #[serde(rename = "bitmask_4bit")]
     Bitmask4bit,
@@ -102,7 +122,7 @@ pub enum AutoTileRule {
 }
 
 /// A standalone tileset file (.cartile-ts)
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, JsonSchema, Serialize, Deserialize)]
 pub struct TilesetFile {
     pub cartile: String,
 
