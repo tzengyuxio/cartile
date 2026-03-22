@@ -3,12 +3,14 @@ use std::path::Path;
 
 use anyhow::Context;
 use cartile_format::{
-    Grid, GridType, HeightMode, HexOrientation, Layer, MapObject, ObjectLayer, Point, Projection,
-    ProjectionType, Properties, Property, PropertyType, Shape, Stagger, StaggerAxis, StaggerIndex,
-    TileId, TileLayer, Tileset, TilesetEntry, Topology, CartileMap,
+    CartileMap, Grid, GridType, HeightMode, HexOrientation, Layer, MapObject, ObjectLayer, Point,
+    Projection, ProjectionType, Properties, Property, PropertyType, Shape, Stagger, StaggerAxis,
+    StaggerIndex, TileId, TileLayer, Tileset, TilesetEntry, Topology,
 };
 
-use super::types::{TiledLayer, TiledMap, TiledObject, TiledProperty, TiledTileset, TiledTilesetEntry};
+use super::types::{
+    TiledLayer, TiledMap, TiledObject, TiledProperty, TiledTileset, TiledTilesetEntry,
+};
 
 const TILED_GID_MASK: u32 = 0x0FFF_FFFF;
 const HEX_ROTATION_BIT: u32 = 0x1000_0000;
@@ -75,7 +77,14 @@ pub fn convert_property(tp: &TiledProperty) -> (String, Property, Vec<String>) {
             (PropertyType::String, tp.value.clone())
         }
     };
-    (tp.name.clone(), Property { property_type: prop_type, value }, warnings)
+    (
+        tp.name.clone(),
+        Property {
+            property_type: prop_type,
+            value,
+        },
+        warnings,
+    )
 }
 
 /// Convert a Vec of Tiled properties to a cartile Properties map.
@@ -114,13 +123,18 @@ pub fn convert_tiled_map(
 ) -> anyhow::Result<(CartileMap, Vec<String>)> {
     let mut warnings: Vec<String> = Vec::new();
 
+    // Reject infinite/chunk-based maps
+    if tiled.infinite {
+        anyhow::bail!("infinite/chunk-based maps are not supported");
+    }
+
     // Warn if the render order is non-default
-    if let Some(ref order) = tiled.renderorder {
-        if order != "right-down" {
-            warnings.push(format!(
-                "non-default renderorder '{order}' — cartile always uses right-down"
-            ));
-        }
+    if let Some(ref order) = tiled.renderorder
+        && order != "right-down"
+    {
+        warnings.push(format!(
+            "non-default renderorder '{order}' — cartile always uses right-down"
+        ));
     }
 
     let (properties, prop_warnings) = convert_properties(&tiled.properties);
@@ -149,31 +163,38 @@ pub fn convert_tiled_map(
 // ---------------------------------------------------------------------------
 
 fn convert_grid(tiled: &TiledMap) -> anyhow::Result<Grid> {
-    let (grid_type, projection_type, stagger, orientation) =
-        match tiled.orientation.as_str() {
-            "orthogonal" => (GridType::Square, ProjectionType::Orthogonal, None, None),
-            "isometric" => (GridType::Square, ProjectionType::Isometric, None, None),
-            "staggered" => {
-                let stagger = parse_stagger(tiled)?;
-                (GridType::Square, ProjectionType::Isometric, Some(stagger), None)
-            }
-            "hexagonal" => {
-                let stagger = parse_stagger(tiled)?;
-                let orientation = match tiled.staggeraxis.as_deref() {
-                    Some("y") => HexOrientation::PointyTop,
-                    Some("x") => HexOrientation::FlatTop,
-                    _ => {
-                        return Err(anyhow::anyhow!(
-                            "hexagonal map missing staggeraxis"
-                        ));
-                    }
-                };
-                (GridType::Hexagonal, ProjectionType::Orthogonal, Some(stagger), Some(orientation))
-            }
-            other => {
-                return Err(anyhow::anyhow!("unknown orientation: '{other}'"));
-            }
-        };
+    let (grid_type, projection_type, stagger, orientation) = match tiled.orientation.as_str() {
+        "orthogonal" => (GridType::Square, ProjectionType::Orthogonal, None, None),
+        "isometric" => (GridType::Square, ProjectionType::Isometric, None, None),
+        "staggered" => {
+            let stagger = parse_stagger(tiled)?;
+            (
+                GridType::Square,
+                ProjectionType::Isometric,
+                Some(stagger),
+                None,
+            )
+        }
+        "hexagonal" => {
+            let stagger = parse_stagger(tiled)?;
+            let orientation = match tiled.staggeraxis.as_deref() {
+                Some("y") => HexOrientation::PointyTop,
+                Some("x") => HexOrientation::FlatTop,
+                _ => {
+                    return Err(anyhow::anyhow!("hexagonal map missing staggeraxis"));
+                }
+            };
+            (
+                GridType::Hexagonal,
+                ProjectionType::Orthogonal,
+                Some(stagger),
+                Some(orientation),
+            )
+        }
+        other => {
+            return Err(anyhow::anyhow!("unknown orientation: '{other}'"));
+        }
+    };
 
     Ok(Grid {
         grid_type,
@@ -198,12 +219,20 @@ fn parse_stagger(tiled: &TiledMap) -> anyhow::Result<Stagger> {
     let axis = match tiled.staggeraxis.as_deref() {
         Some("x") => StaggerAxis::X,
         Some("y") => StaggerAxis::Y,
-        _ => return Err(anyhow::anyhow!("staggered/hexagonal map missing staggeraxis")),
+        _ => {
+            return Err(anyhow::anyhow!(
+                "staggered/hexagonal map missing staggeraxis"
+            ));
+        }
     };
     let index = match tiled.staggerindex.as_deref() {
         Some("odd") => StaggerIndex::Odd,
         Some("even") => StaggerIndex::Even,
-        _ => return Err(anyhow::anyhow!("staggered/hexagonal map missing staggerindex")),
+        _ => {
+            return Err(anyhow::anyhow!(
+                "staggered/hexagonal map missing staggerindex"
+            ));
+        }
     };
     Ok(Stagger { axis, index })
 }
@@ -320,9 +349,9 @@ fn convert_layer(tiled_layer: &TiledLayer, warnings: &mut Vec<String>, out: &mut
         TiledLayer::ObjectGroup(ol) => {
             let mut objects = Vec::new();
             for obj in &ol.objects {
-                match convert_object(obj, warnings) {
-                    Some(map_obj) => objects.push(map_obj),
-                    None => {} // skipped (gid/text/template)
+                // None means skipped (gid/text/template)
+                if let Some(map_obj) = convert_object(obj, warnings) {
+                    objects.push(map_obj);
                 }
             }
             let (properties, prop_warnings) = convert_properties(&ol.properties);
@@ -357,11 +386,17 @@ fn convert_layer(tiled_layer: &TiledLayer, warnings: &mut Vec<String>, out: &mut
 fn convert_object(obj: &TiledObject, warnings: &mut Vec<String>) -> Option<MapObject> {
     // Skip tile objects, text objects, and template instances
     if obj.gid.is_some() {
-        warnings.push(format!("object {} '{}' is a tile object — skipped", obj.id, obj.name));
+        warnings.push(format!(
+            "object {} '{}' is a tile object — skipped",
+            obj.id, obj.name
+        ));
         return None;
     }
     if obj.text.is_some() {
-        warnings.push(format!("object {} '{}' is a text object — skipped", obj.id, obj.name));
+        warnings.push(format!(
+            "object {} '{}' is a text object — skipped",
+            obj.id, obj.name
+        ));
         return None;
     }
     if obj.template.is_some() {
@@ -400,17 +435,11 @@ fn detect_shape(obj: &TiledObject) -> (Shape, Option<Vec<Point>>) {
         return (Shape::Ellipse, None);
     }
     if let Some(polygon) = &obj.polygon {
-        let pts = polygon
-            .iter()
-            .map(|p| Point { x: p.x, y: p.y })
-            .collect();
+        let pts = polygon.iter().map(|p| Point { x: p.x, y: p.y }).collect();
         return (Shape::Polygon, Some(pts));
     }
     if let Some(polyline) = &obj.polyline {
-        let pts = polyline
-            .iter()
-            .map(|p| Point { x: p.x, y: p.y })
-            .collect();
+        let pts = polyline.iter().map(|p| Point { x: p.x, y: p.y }).collect();
         return (Shape::Polyline, Some(pts));
     }
     // Default: axis-aligned rectangle
