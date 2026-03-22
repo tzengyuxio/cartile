@@ -146,6 +146,16 @@ function loadMap(map) {
     mapData = map;
     hoveredTile = null;
 
+    console.log('Map loaded:', map.name, 'grid:', map.grid);
+    console.log('Loaded tileset images:', Object.keys(tilesetImages));
+    if (map.tilesets) {
+        for (const ts of map.tilesets) {
+            const img = ts.image || '';
+            const basename = img.split('/').pop().toLowerCase();
+            console.log('Tileset', ts.name, 'needs image:', basename, 'found:', !!tilesetImages[basename]);
+        }
+    }
+
     // Initialize layer visibility
     layerVisibility = {};
     if (map.layers) {
@@ -190,8 +200,11 @@ function render() {
     // Apply camera transform
     ctx.setTransform(camera.zoom, 0, 0, camera.zoom, -camera.x * camera.zoom, -camera.y * camera.zoom);
 
-    const tileWidth = mapData.tile_width || 16;
-    const tileHeight = mapData.tile_height || 16;
+    const grid = mapData.grid || {};
+    const tileWidth = grid.tile_width || 16;
+    const tileHeight = grid.tile_height || 16;
+    const mapWidth = grid.width || 0;
+    const mapHeight = grid.height || 0;
 
     // Render each visible tile layer in order
     if (!mapData.layers) return;
@@ -203,8 +216,8 @@ function render() {
         const data = layer.data || layer.tiles;
         if (!data) continue;
 
-        const layerWidth = layer.width || mapData.width;
-        const layerHeight = layer.height || mapData.height;
+        const layerWidth = layer.width || mapWidth;
+        const layerHeight = layer.height || mapHeight;
 
         for (let row = 0; row < layerHeight; row++) {
             for (let col = 0; col < layerWidth; col++) {
@@ -410,13 +423,16 @@ function screenToMap(screenX, screenY) {
 
 function updateHoveredTile(screenX, screenY) {
     const { mapX, mapY } = screenToMap(screenX, screenY);
-    const tileWidth = mapData.tile_width || 16;
-    const tileHeight = mapData.tile_height || 16;
+    const grid = mapData.grid || {};
+    const tileWidth = grid.tile_width || 16;
+    const tileHeight = grid.tile_height || 16;
+    const mapWidth = grid.width || 0;
+    const mapHeight = grid.height || 0;
 
     const col = Math.floor(mapX / tileWidth);
     const row = Math.floor(mapY / tileHeight);
 
-    if (col < 0 || row < 0 || col >= mapData.width || row >= mapData.height) {
+    if (col < 0 || row < 0 || col >= mapWidth || row >= mapHeight) {
         document.getElementById('status-cursor').textContent = '–';
         document.getElementById('status-gid').textContent = '–';
         document.getElementById('status-layer').textContent = '–';
@@ -439,7 +455,7 @@ function updateHoveredTile(screenX, screenY) {
             const data = layer.data || layer.tiles;
             if (!data) continue;
 
-            const layerWidth = layer.width || mapData.width;
+            const layerWidth = layer.width || mapWidth;
             const idx = row * layerWidth + col;
             const raw = data[idx];
 
@@ -540,16 +556,17 @@ function updateMapInfo() {
         return;
     }
 
+    const grid = mapData.grid || {};
     const lines = [
         { label: 'Name', value: mapData.name || '(unnamed)' },
-        { label: 'Size', value: mapData.width + ' × ' + mapData.height + ' tiles' },
-        { label: 'Tile Size', value: (mapData.tile_width || '?') + ' × ' + (mapData.tile_height || '?') + ' px' },
+        { label: 'Size', value: (grid.width || '?') + ' × ' + (grid.height || '?') + ' tiles' },
+        { label: 'Tile Size', value: (grid.tile_width || '?') + ' × ' + (grid.tile_height || '?') + ' px' },
         { label: 'Layers', value: mapData.layers ? mapData.layers.length : 0 },
         { label: 'Tilesets', value: mapData.tilesets ? mapData.tilesets.length : 0 },
     ];
 
-    if (mapData.version) {
-        lines.push({ label: 'Version', value: mapData.version });
+    if (mapData.cartile) {
+        lines.push({ label: 'Format', value: 'v' + mapData.cartile });
     }
 
     container.innerHTML = lines
