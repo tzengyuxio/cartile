@@ -24,10 +24,20 @@ pub enum ValidationError {
     OverlappingGidRanges { a: String, b: String },
 
     #[error("layer '{name}': data length {actual} != expected {expected} (width * height)")]
-    InvalidDataLength { name: String, actual: usize, expected: usize },
+    InvalidDataLength {
+        name: String,
+        actual: usize,
+        expected: usize,
+    },
 
-    #[error("heightmap layer '{name}': data length {actual} != expected {expected} ((width+1) * (height+1))")]
-    InvalidHeightmapLength { name: String, actual: usize, expected: usize },
+    #[error(
+        "heightmap layer '{name}': data length {actual} != expected {expected} ((width+1) * (height+1))"
+    )]
+    InvalidHeightmapLength {
+        name: String,
+        actual: usize,
+        expected: usize,
+    },
 
     #[error("height_mode is 'vertex' but no heightmap layer found")]
     MissingHeightmapLayer,
@@ -62,6 +72,9 @@ pub enum ValidationError {
     #[error("duplicate object id: {id}")]
     DuplicateObjectId { id: u64 },
 
-    #[error("auto_tile bitmask {bitmask} invalid for rule '{rule}'")]
-    InvalidAutoTileBitmask { bitmask: u8, rule: String },
+    #[error("auto_tile bitmask {bitmask} invalid for rule {rule:?}")]
+    InvalidAutoTileBitmask {
+        bitmask: u8,
+        rule: crate::types::tileset::AutoTileRule,
+    },
 }

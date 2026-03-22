@@ -39,8 +39,9 @@ impl CartileMap {
     }
 
     pub fn from_file(path: impl AsRef<Path>) -> Result<Self, CartileError> {
-        let content = std::fs::read_to_string(path)?;
-        Self::from_json(&content)
+        let file = std::fs::File::open(path)?;
+        let reader = std::io::BufReader::new(file);
+        Ok(serde_json::from_reader(reader)?)
     }
 
     pub fn to_json_pretty(&self) -> Result<String, CartileError> {
@@ -48,8 +49,9 @@ impl CartileMap {
     }
 
     pub fn to_file(&self, path: impl AsRef<Path>) -> Result<(), CartileError> {
-        let json = self.to_json_pretty()?;
-        std::fs::write(path, json)?;
+        let file = std::fs::File::create(path)?;
+        let writer = std::io::BufWriter::new(file);
+        serde_json::to_writer_pretty(writer, self)?;
         Ok(())
     }
 }
