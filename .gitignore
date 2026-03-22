@@ -6,6 +6,7 @@ Cargo.lock
 # WASM build output
 /pkg/
 /wasm-pack-out/
+/web/pkg/
 
 # OS
 .DS_Store
@@ -21,3 +22,4 @@ Thumbs.db
 # Environment
 .env
 .env.local
+.superpowers/
