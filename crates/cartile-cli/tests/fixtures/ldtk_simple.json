@@ -1,0 +1,81 @@
+{
+    "__header__": {
+        "app": "LDtk",
+        "appAuthor": "Sebastien Benard",
+        "appVersion": "1.5.3",
+        "url": "https://ldtk.io"
+    },
+    "jsonVersion": "1.5.3",
+    "defaultGridSize": 16,
+    "defs": {
+        "tilesets": [
+            {
+                "uid": 1,
+                "identifier": "Terrain",
+                "pxWid": 64,
+                "pxHei": 64,
+                "tileGridSize": 16,
+                "relPath": "terrain.png",
+                "padding": 0,
+                "spacing": 0
+            }
+        ]
+    },
+    "worlds": [],
+    "levels": [
+        {
+            "identifier": "Level_0",
+            "uid": 100,
+            "pxWid": 48,
+            "pxHei": 32,
+            "layerInstances": [
+                {
+                    "__type": "Tiles",
+                    "__identifier": "Ground",
+                    "__cWid": 3,
+                    "__cHei": 2,
+                    "__gridSize": 16,
+                    "__tilesetDefUid": 1,
+                    "gridTiles": [
+                        { "px": [0, 0], "t": 0, "f": 0 },
+                        { "px": [16, 0], "t": 1, "f": 0 },
+                        { "px": [32, 0], "t": 2, "f": 1 },
+                        { "px": [0, 16], "t": 3, "f": 0 },
+                        { "px": [16, 16], "t": 4, "f": 2 },
+                        { "px": [32, 16], "t": 5, "f": 0 }
+                    ],
+                    "autoLayerTiles": [],
+                    "intGridCsv": [],
+                    "entityInstances": []
+                },
+                {
+                    "__type": "Entities",
+                    "__identifier": "Objects",
+                    "__cWid": 3,
+                    "__cHei": 2,
+                    "__gridSize": 16,
+                    "__tilesetDefUid": null,
+                    "gridTiles": [],
+                    "autoLayerTiles": [],
+                    "intGridCsv": [],
+                    "entityInstances": [
+                        {
+                            "__identifier": "Player",
+                            "px": [8.0, 8.0],
+                            "width": 16.0,
+                            "height": 16.0,
+                            "iid": "abc-123"
+                        },
+                        {
+                            "__identifier": "Coin",
+                            "px": [32.0, 16.0],
+                            "width": 0.0,
+                            "height": 0.0,
+                            "iid": "def-456"
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
