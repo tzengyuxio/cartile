@@ -1,3 +1,4 @@
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use super::object::MapObject;
@@ -5,7 +6,7 @@ use super::property::Properties;
 use crate::tile_id::TileId;
 
 /// A map layer — either tile data, placed objects, or heightmap values.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, JsonSchema, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Layer {
     Tile(TileLayer),
@@ -14,7 +15,7 @@ pub enum Layer {
 }
 
 /// A layer of tile IDs arranged in a flat array (row-major order).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, JsonSchema, Serialize, Deserialize)]
 pub struct TileLayer {
     pub name: String,
 
@@ -37,7 +38,7 @@ pub struct TileLayer {
 }
 
 /// A layer of placed map objects (entities, triggers, paths, etc.).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, JsonSchema, Serialize, Deserialize)]
 pub struct ObjectLayer {
     pub name: String,
 
@@ -54,7 +55,7 @@ pub struct ObjectLayer {
 }
 
 /// A layer of signed integer height values for isometric/3D-ish maps.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, JsonSchema, Serialize, Deserialize)]
 pub struct HeightmapLayer {
     pub name: String,
 

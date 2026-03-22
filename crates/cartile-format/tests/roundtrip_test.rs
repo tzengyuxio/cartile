@@ -1,4 +1,5 @@
 use cartile_format::*;
+use serde_json::Value;
 
 #[test]
 fn minimal_map_roundtrip() {
@@ -119,4 +120,14 @@ fn tileset_file_roundtrip() {
     let tsf: TilesetFile = serde_json::from_str(&content).unwrap();
     assert_eq!(tsf.tileset.name, "terrain");
     assert_eq!(tsf.tileset.tile_count, 16);
+}
+
+#[test]
+fn generate_schema() {
+    let schema = cartile_format::generate_map_schema();
+    let parsed: Value = serde_json::from_str(&schema).unwrap();
+    assert_eq!(parsed["type"], "object");
+    assert!(parsed["properties"]["cartile"].is_object());
+    assert!(parsed["properties"]["grid"].is_object());
+    assert!(parsed["properties"]["layers"].is_object());
 }

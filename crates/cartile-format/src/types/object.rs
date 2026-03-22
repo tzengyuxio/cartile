@@ -1,9 +1,10 @@
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use super::property::Properties;
 
 /// A map object placed in an ObjectLayer, using pixel coordinates.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, JsonSchema, Serialize, Deserialize)]
 pub struct MapObject {
     pub id: u64,
 
@@ -39,7 +40,7 @@ fn is_zero_f64(v: &f64) -> bool {
 }
 
 /// The geometric shape of a map object.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, JsonSchema, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Shape {
     Point,
@@ -50,7 +51,7 @@ pub enum Shape {
 }
 
 /// A 2D point used in polygon/polyline definitions.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, JsonSchema, Serialize, Deserialize)]
 pub struct Point {
     pub x: f64,
     pub y: f64,

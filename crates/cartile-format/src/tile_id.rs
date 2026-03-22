@@ -1,3 +1,4 @@
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 const FLIP_HORIZONTAL: u32 = 0x80000000;
@@ -14,7 +15,7 @@ const GID_MASK: u32 = 0x1FFFFFFF;
 /// - bit 30: flip vertical
 /// - bit 29: flip diagonal (anti-diagonal)
 /// - bits 28-0: global tile ID (GID), 0 = empty
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, JsonSchema, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct TileId(u32);
 

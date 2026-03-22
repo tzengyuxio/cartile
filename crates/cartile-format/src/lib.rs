@@ -13,3 +13,9 @@ pub use types::map::CartileMap;
 pub use types::object::*;
 pub use types::property::{Properties, Property, PropertyType};
 pub use types::tileset::*;
+
+/// Generate the JSON Schema for the CartileMap format as a pretty-printed JSON string.
+pub fn generate_map_schema() -> String {
+    let schema = schemars::schema_for!(CartileMap);
+    serde_json::to_string_pretty(&schema).expect("schema serialization should not fail")
+}
