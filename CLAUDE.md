@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A universal tilemap toolkit with a cross-engine runtime and editor, built in Rust. The name blends *cartography* and *tile*.
 
-- **Status**: Pre-development (Phase 1 planning — no Rust code yet)
+- **Status**: Phase 1 complete (core library, CLI, WASM bindings)
 - **License**: MIT
 
 ## Vision
@@ -42,22 +42,32 @@ Core logic is written once in Rust. Each engine gets a thin binding layer (type 
 - **Editor (Phase 2)**: Rust + WASM + WebGPU (fallback to Canvas 2D)
 - **Engine bindings**: Godot (gdext), Unity (C# P/Invoke), Bevy (Rust crate), PixiJS (wasm-bindgen)
 
+## Workspace Structure
+
+This is a Cargo workspace with three crates:
+
+```
+crates/
+├── cartile-format/   # Core library: types, parsing, validation, auto-tiling
+├── cartile-cli/      # CLI tool: convert, export, validate
+└── cartile-wasm/     # WASM bindings for browser/JS usage
+```
+
 ## Build Commands
 
-> No buildable code yet. When the Rust project is initialized, expect:
-
 ```bash
-cargo build          # build
-cargo test           # run all tests
-cargo test <name>    # run a single test
-cargo fmt            # format code
-cargo clippy         # lint
-wasm-pack build      # build WASM target
+cargo build                            # build all crates
+cargo test                             # run all tests
+cargo test -p cartile-format           # test a single crate
+cargo fmt                              # format code
+cargo clippy                           # lint
+wasm-pack build crates/cartile-wasm --target web   # build WASM target
+cargo install --path crates/cartile-cli             # install CLI locally
 ```
 
 ## Development Phases
 
-### Phase 1 — Foundation (current target)
+### Phase 1 — Foundation (complete)
 - Format spec v0.1 (JSON Schema): orthogonal/isometric/hex tilemap, tileset definitions, layers, custom properties
 - Rust core library: format read/write/validate, bitmask-based auto-tiling, tileset management
 - CLI tool: format conversion (TMX/LDtk JSON ↔ cartile format)
@@ -97,5 +107,7 @@ wasm-pack build      # build WASM target
 
 ## Related Documents
 
+- `docs/usage-guide.md` — CLI reference and library usage guide
 - `docs/specs/feasibility-analysis.md` — Full market feasibility analysis and product design
+- `docs/specs/format-spec-v0.1-design.md` — Format spec v0.1 design document
 - `docs/research/tilemap-tools-landscape.md` — Competitive landscape research
