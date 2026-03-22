@@ -4,4 +4,6 @@ pub mod types;
 
 pub use error::{CartileError, ValidationError};
 pub use tile_id::TileId;
+pub use types::grid::*;
 pub use types::property::{Properties, Property, PropertyType};
+pub use types::tileset::*;
