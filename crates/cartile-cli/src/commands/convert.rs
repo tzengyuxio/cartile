@@ -30,10 +30,7 @@ pub fn run(args: ConvertArgs) -> anyhow::Result<()> {
         .and_then(|s| s.to_str())
         .unwrap_or("untitled");
 
-    let input_dir = args
-        .input
-        .parent()
-        .unwrap_or(std::path::Path::new("."));
+    let input_dir = args.input.parent().unwrap_or(std::path::Path::new("."));
 
     let output = args
         .output
@@ -45,10 +42,7 @@ pub fn run(args: ConvertArgs) -> anyhow::Result<()> {
     };
 
     let (map, warnings) = cartile_cli::tiled::convert::convert_tiled_map(
-        &tiled_map,
-        map_name,
-        input_dir,
-        output_dir,
+        &tiled_map, map_name, input_dir, output_dir,
     )?;
 
     for w in &warnings {
